@@ -2,7 +2,7 @@
 
 > English: [README_EN.md](README_EN.md)
 
-把 Minecraft 整合包直接嵌入 Zalith Launcher 2（ZL2）的 APK：玩家安装后首次启动自动解包/导入，**无需二次下载整合包，直接游玩**（配合完整游戏目录可完全离线）。
+将 Minecraft 整合包直接嵌入 Zalith Launcher 2（ZL2）的 APK：玩家安装后首次启动自动解包/导入，**无需二次下载整合包，直接游玩**（配合完整游戏目录可完全离线）。
 
 > 本项目是独立工具，与 [ZalithLauncher/ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2) 官方项目**无隶属关系**。本仓库不包含 ZL2 应用源码，只提供接入补丁（见 [android/](android/)）。
 
