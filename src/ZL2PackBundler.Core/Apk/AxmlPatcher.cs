@@ -100,11 +100,14 @@ public static class AxmlPatcher
         return Serialize(doc);
     }
 
-    /// <summary>
-    /// 把作者信息写入 &lt;application&gt; 的 meta-data（zl2packbundler.author，字符串值）。
-    /// 已存在同名 meta-data 时替换值，避免重复写入。
-    /// </summary>
+    /// <summary>把作者信息写入 &lt;application&gt; 的 meta-data（zl2packbundler.author）。</summary>
     public static byte[] ApplyAuthor(byte[] manifestBytes, string author)
+        => ApplyMetaData(manifestBytes, AuthorMetaDataName, author);
+
+    /// <summary>
+    /// 写入/替换 &lt;application&gt; 下的一个字符串 meta-data（已存在同名时替换值，避免重复）。
+    /// </summary>
+    public static byte[] ApplyMetaData(byte[] manifestBytes, string name, string value)
     {
         var doc = Parse(manifestBytes);
         var androidNs = (uint)(doc.Pool.GetIndex("http://schemas.android.com/apk/res/android")
@@ -115,16 +118,16 @@ public static class AxmlPatcher
         foreach (var child in application.Children)
         {
             if (IsElement(child, "meta-data", androidNs, doc.Pool)
-                && child.GetAttr(doc.Pool, androidNs, "name") == AuthorMetaDataName)
+                && child.GetAttr(doc.Pool, androidNs, "name") == name)
             {
-                SetAttr(child, doc.Pool, androidNs, "value", author);
+                SetAttr(child, doc.Pool, androidNs, "value", value);
                 return Serialize(doc);
             }
         }
 
         var meta = NewElement(doc, androidNs, "meta-data");
-        meta.Attrs.Add(Attr(doc.Pool, androidNs, "name", AuthorMetaDataName));
-        meta.Attrs.Add(Attr(doc.Pool, androidNs, "value", author));
+        meta.Attrs.Add(Attr(doc.Pool, androidNs, "name", name));
+        meta.Attrs.Add(Attr(doc.Pool, androidNs, "value", value));
         application.Children.Add(meta);
         return Serialize(doc);
     }

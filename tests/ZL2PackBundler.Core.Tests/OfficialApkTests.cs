@@ -159,6 +159,34 @@ public class OfficialApkTests
     }
 
     [Fact]
+    public void ApplyMetaDataWritesToolAndVersion()
+    {
+        var bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "AndroidManifest.bin"));
+        var patched = AxmlPatcher.ApplyMetaData(bytes, "zl2packbundler.tool", "ZL2PackBundler");
+        patched = AxmlPatcher.ApplyMetaData(patched, "zl2packbundler.version", "1.1.0");
+
+        var doc = AxmlPatcher.Parse(patched);
+        var androidNs = (uint)doc.Pool.GetIndex("http://schemas.android.com/apk/res/android")!;
+        var app = FindApp(doc.Roots, doc.Pool)!;
+
+        var names = app.Children
+            .Where(c => c.Kind == 0x0102 && doc.Pool.Strings[(int)c.NameIdx] == "meta-data")
+            .Select(c => (GetAttrValue(c, doc.Pool, androidNs, "name"), GetAttrValue(c, doc.Pool, androidNs, "value")))
+            .ToList();
+        Assert.Contains(names, n => n.Item1 == "zl2packbundler.tool" && n.Item2 == "ZL2PackBundler");
+        Assert.Contains(names, n => n.Item1 == "zl2packbundler.version" && n.Item2 == "1.1.0");
+        Assert.Equal(0, patched.Length % 4);
+
+        // 重复写入替换值，不产生重复条目
+        var again = AxmlPatcher.Parse(AxmlPatcher.ApplyMetaData(patched, "zl2packbundler.version", "9.9.9"));
+        var app2 = FindApp(again.Roots, again.Pool)!;
+        var count = app2.Children.Count(c => c.Kind == 0x0102
+            && again.Pool.Strings[(int)c.NameIdx] == "meta-data"
+            && GetAttrValue(c, again.Pool, androidNs, "name") == "zl2packbundler.version");
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
     public void InstallerActivityUsesTypedLaunchModeAndExported()
     {
         var bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "AndroidManifest.bin"));

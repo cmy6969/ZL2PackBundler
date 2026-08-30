@@ -111,8 +111,14 @@ public static class PackPipeline
                     };
             }
 
-            // 可选：修改包名 / 应用显示名称 / 写入作者信息（两条路径都生效）
-            if (options.PackageName != null || options.AppName != null || options.Author != null)
+            // 打包工具信息资产（两条路径都写入；App 端「设置-关于」与安装器页脚读取）
+            var toolInfoJson = System.Text.Encoding.UTF8.GetBytes(
+                BundledTools.BuildToolInfoJson(options.Author));
+            extraAssets = (extraAssets ?? new List<(string, byte[])>())
+                .Append((BundledTools.ToolInfoZipEntry, toolInfoJson))
+                .ToList();
+
+            // 可选：修改包名 / 应用显示名称 / 写入作者信息；并始终写入打包工具 meta-data（两条路径都生效）
             {
                 var pkgRegex = new System.Text.RegularExpressions.Regex(
                     "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$");
@@ -138,6 +144,9 @@ public static class PackPipeline
                     progress?.Invoke($"写入作者信息：{options.Author}");
                     renameManifest = AxmlPatcher.ApplyAuthor(renameManifest, options.Author);
                 }
+                progress?.Invoke($"写入打包工具信息：ZL2PackBundler {BundledTools.ToolVersion}");
+                renameManifest = AxmlPatcher.ApplyMetaData(renameManifest, "zl2packbundler.tool", "ZL2PackBundler");
+                renameManifest = AxmlPatcher.ApplyMetaData(renameManifest, "zl2packbundler.version", BundledTools.ToolVersion);
                 manifestOverride = renameManifest;
             }
 
@@ -157,6 +166,8 @@ public static class PackPipeline
             if (options.Author != null)
                 warnings.Add(new GuardWarning("info",
                     "已写入作者信息（manifest.json 的 author 字段 + AndroidManifest meta-data zl2packbundler.author）。"));
+            warnings.Add(new GuardWarning("info",
+                $"已写入打包工具信息（assets/zl2packbundler/tool-info.json + meta-data zl2packbundler.tool/version，版本 {BundledTools.ToolVersion}；App 端「设置-关于」可见）。"));
 
             progress?.Invoke("zipalign + apksigner 签名…");
             ApkSigner.Run(sdk.BuildToolsDir, rebuilt, options.OutputApk, options.Signing, progress);

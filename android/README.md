@@ -12,6 +12,7 @@
 | --- | --- |
 | `ZalithLauncher/src/main/java/.../components/BundledModpackTask.kt` | splash 解包任务：先校验 pack.zip 原始字节 SHA-256，再解包到游戏目录（路径穿越防护、标记文件、磁盘空间检查）；packzip 类型转发给导入管线 |
 | `ZalithLauncher/src/main/java/.../game/download/modpack/install/BundledModpackManifest.kt` | 跨端契约 manifest 解析与校验（schema=1） |
+| `ZalithLauncher/src/main/java/.../game/download/modpack/install/BundledToolInfo.kt` | 打包工具信息（tool-info.json）解析，「设置-关于」展示 |
 | `ZalithLauncher/src/test/java/.../components/BundledPackPathSafetyTest.kt` | zip 路径安全单测 |
 | `ZalithLauncher/src/test/java/.../game/download/modpack/install/BundledModpackManifestTest.kt` | 契约校验单测 |
 
@@ -22,7 +23,8 @@
 | `ui/activities/SplashActivity.kt` | 挂载 BundledModpackTask；packzip 自动转发导入 |
 | `ui/activities/MainActivity.kt` | 透传 bundled 导入参数 |
 | `viewmodel/ModpackImportViewModel.kt` | bundled 模式跳过版本名输入、导入成功后写标记 |
-| `res/values{,-zh-rCN,-zh-rTW}/strings.xml` | 新增 splash 文案（三语） |
+| `ui/screens/content/settings/AboutInfoScreen.kt` | 「设置-关于」新增「整合包内嵌工具」板块（存在 tool-info.json 时显示） |
+| `res/values{,-zh-rCN,-zh-rTW}/strings.xml` | 新增 splash 与关于页文案（三语） |
 
 ## 应用方式（二选一）
 

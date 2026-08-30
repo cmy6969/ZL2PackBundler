@@ -259,6 +259,90 @@ index 00000000..3dc865ac
 +    fun markerMatches(file: File): Boolean =
 +        file.exists() && runCatching { file.readText() }.getOrNull() == markerContent
 +}
+diff --git a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/game/download/modpack/install/BundledToolInfo.kt b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/game/download/modpack/install/BundledToolInfo.kt
+new file mode 100644
+index 00000000..af9fb07ba8eec4b4d8f1b01084300dfb12c1e18e
+--- /dev/null
++++ b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/game/download/modpack/install/BundledToolInfo.kt
+@@ -0,0 +1,37 @@
++/*
++ * Zalith Launcher 2
++ * Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
++ * (GPL-3.0，见仓库 LICENSE)
++ */
++package com.movtery.zalithlauncher.game.download.modpack.install
++
++import android.content.Context
++import com.movtery.zalithlauncher.utils.GSON
++import com.movtery.zalithlauncher.utils.logging.Logger
++
++private const val TAG = "BundledToolInfo"
++
++/** 打包工具信息（跨端契约，由 ZL2PackBundler 写入 assets/zl2packbundler/tool-info.json） */
++data class BundledToolInfo(
++    val tool: String? = null,
++    val version: String? = null,
++    val packedAt: String? = null,
++    val author: String? = null,
++    val repo: String? = null,
++) {
++    companion object {
++        const val ASSET_PATH = "zl2packbundler/tool-info.json"
++
++        /** 从 assets 读取打包工具信息；不存在返回 null（未内嵌整合包的普通构建）。 */
++        fun load(context: Context): BundledToolInfo? {
++            val json = runCatching {
++                context.assets.open(ASSET_PATH).use { it.readBytes().decodeToString() }
++            }.getOrElse {
++                return null
++            }
++            return runCatching { GSON.fromJson(json, BundledToolInfo::class.java) }
++                .onFailure { Logger.error(TAG, "Failed to parse bundled tool info", it) }
++                .getOrNull()
++        }
++    }
++}
+diff --git a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/AboutInfoScreen.kt b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/AboutInfoScreen.kt
+index 0f2649fe1e9289dcf2f75c3cb0f6b6d2f733fdd8..0000000000000000000000000000000000000000 100644
+--- a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/AboutInfoScreen.kt
++++ b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/screens/content/settings/AboutInfoScreen.kt
+@@ -57,6 +57,7 @@
+ import com.movtery.zalithlauncher.BuildConfig
+ import com.movtery.zalithlauncher.BuildKeys
+ import com.movtery.zalithlauncher.R
++import com.movtery.zalithlauncher.game.download.modpack.install.BundledToolInfo
+ import com.movtery.zalithlauncher.game.plugin.ApkPlugin
+ import com.movtery.zalithlauncher.game.plugin.PluginLoader
+ import com.movtery.zalithlauncher.game.plugin.appCacheIcon
+@@ -230,7 +230,28 @@
+                 }
+             }
+ 
++            //整合包内嵌工具信息（ZL2PackBundler 写入 assets/zl2packbundler/tool-info.json）
++            val bundledToolInfo = remember { BundledToolInfo.load(LocalContext.current) }
++            bundledToolInfo?.let { info ->
++                animatedItem(scope) { yOffset ->
++                    ChunkLayout(
++                        modifier = Modifier.offset { IntOffset(x = 0, y = yOffset.roundToPx()) },
++                        title = stringResource(R.string.about_bundled_tool_title)
++                    ) {
++                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
++                            LinkIconItem(
++                                icon = painterResource(R.drawable.ic_github),
++                                title = info.tool ?: "ZL2PackBundler",
++                                text = listOfNotNull(info.version, info.packedAt, info.author).joinToString(" · "),
++                                openLink = info.repo?.let { { openLink(it) } },
++                                useImage = false
++                            )
++                        }
++                    }
++                }
++            }
++
+             //已加载插件板块
+             PluginLoader.allPlugins.takeIf { it.isNotEmpty() }?.let { allPlugins ->
+                 animatedItem(scope) { yOffset ->
+                     ChunkLayout(
 diff --git a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/MainActivity.kt b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/MainActivity.kt
 index c6a8ce5f..d93bb539 100644
 --- a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/MainActivity.kt
@@ -416,12 +500,13 @@ diff --git a/ZalithLauncher/src/main/res/values-zh-rCN/strings.xml b/ZalithLaunc
 index 29b727cb..ec88ca62 100644
 --- a/ZalithLauncher/src/main/res/values-zh-rCN/strings.xml
 +++ b/ZalithLauncher/src/main/res/values-zh-rCN/strings.xml
-@@ -169,6 +169,8 @@
+@@ -169,6 +169,9 @@
      <string name="unpack_screen_lwjgl">轻量级 Java 游戏库，Minecraft 依赖它运行游戏</string>
      <string name="unpack_screen_launcher">启动器依赖的一些组件</string>
      <string name="unpack_screen_jna">让 Minecraft 能直接调用操作系统的底层功能</string>
 +    <string name="unpack_screen_bundled_pack">内嵌整合包</string>
 +    <string name="unpack_screen_bundled_pack_summary">安装此 APK 内嵌的整合包</string>
++    <string name="about_bundled_tool_title">整合包内嵌工具</string>
      <!--  主菜单  -->
      <string name="main_launch_game">启动游戏</string>
      <string name="main_task_menu">任务菜单</string>
@@ -429,12 +514,13 @@ diff --git a/ZalithLauncher/src/main/res/values-zh-rTW/strings.xml b/ZalithLaunc
 index 1da8cd0c..7ae7d9af 100644
 --- a/ZalithLauncher/src/main/res/values-zh-rTW/strings.xml
 +++ b/ZalithLauncher/src/main/res/values-zh-rTW/strings.xml
-@@ -154,6 +154,8 @@
+@@ -154,6 +154,9 @@
      <string name="unpack_screen_lwjgl">輕量級 Java 遊戲函式庫，Minecraft 依賴它執行遊戲</string>
      <string name="unpack_screen_launcher">啟動器依賴的一些元件</string>
      <string name="unpack_screen_jna">讓 Minecraft 能直接呼叫作業系統的底層功能</string>
 +    <string name="unpack_screen_bundled_pack">內嵌整合包</string>
 +    <string name="unpack_screen_bundled_pack_summary">安裝此 APK 內嵌的整合包</string>
++    <string name="about_bundled_tool_title">整合包內嵌工具</string>
      <!--  主選單  -->
      <string name="main_launch_game">啟動遊戲</string>
      <string name="main_task_menu">任務選單</string>
@@ -442,12 +528,13 @@ diff --git a/ZalithLauncher/src/main/res/values/strings.xml b/ZalithLauncher/src
 index ace26904..a338770b 100644
 --- a/ZalithLauncher/src/main/res/values/strings.xml
 +++ b/ZalithLauncher/src/main/res/values/strings.xml
-@@ -168,6 +168,8 @@
+@@ -168,6 +168,9 @@
      <string name="unpack_screen_lwjgl">Lightweight Java Game Library (required by Minecraft)</string>
      <string name="unpack_screen_launcher">Essential launcher components</string>
      <string name="unpack_screen_jna">Enables Minecraft to directly call low-level OS functions</string>
 +    <string name="unpack_screen_bundled_pack">Bundled modpack</string>
 +    <string name="unpack_screen_bundled_pack_summary">Imports the modpack embedded in this APK</string>
++    <string name="about_bundled_tool_title">Bundled modpack tool</string>
      <!-- Main Menu -->
      <string name="main_launch_game">Launch</string>
      <string name="main_task_menu">Task Menu</string>

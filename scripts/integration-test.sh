@@ -52,6 +52,15 @@ axml = z.read('AndroidManifest.xml')
 assert 'zl2packbundler.author'.encode('utf-16-le') in axml, 'missing author meta-data name'
 assert '集成测试作者'.encode('utf-16-le') in axml, 'missing author value'
 print('AndroidManifest meta-data zl2packbundler.author: OK')
+for name in ('zl2packbundler.tool', 'zl2packbundler.version'):
+    assert name.encode('utf-16-le') in axml, 'missing tool meta-data ' + name
+assert 'ZL2PackBundler'.encode('utf-16-le') in axml, 'missing tool value'
+print('AndroidManifest meta-data zl2packbundler.tool/version: OK')
+ti = json.loads(z.read('assets/zl2packbundler/tool-info.json').decode('utf-8'))
+assert ti['tool'] == 'ZL2PackBundler', ti
+assert ti['version'] and ti['packedAt'] and ti['repo'], ti
+assert ti['author'] == '集成测试作者', ti
+print('assets/zl2packbundler/tool-info.json: OK')
 asset_sha = hashlib.sha256(z.read('assets/bundled_pack/pack.zip')).hexdigest()
 assert asset_sha == m['sha256'], (asset_sha, m['sha256'])
 print('内嵌资产原始字节哈希 == manifest.sha256: OK')

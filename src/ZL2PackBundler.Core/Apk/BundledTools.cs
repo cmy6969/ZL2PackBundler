@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using ZL2PackBundler.Core.Models;
 
 namespace ZL2PackBundler.Core.Apk;
 
@@ -9,6 +10,27 @@ namespace ZL2PackBundler.Core.Apk;
 public static class BundledTools
 {
     public const string InstallerConfigZipEntry = "assets/zl2packbundler/installer-config.json";
+    /// <summary>打包工具信息资产（App 端「设置-关于」与安装器页脚读取）。</summary>
+    public const string ToolInfoZipEntry = "assets/zl2packbundler/tool-info.json";
+    public const string ToolRepoUrl = "https://github.com/cmy6969/ZL2PackBundler";
+
+    /// <summary>工具版本（Core 程序集版本，由 csproj 的 &lt;Version&gt; 决定）。</summary>
+    public static string ToolVersion =>
+        typeof(BundledTools).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+
+    /// <summary>生成写入 APK 的工具信息 json（工具名/版本/打包时间/仓库/可选作者）。</summary>
+    public static string BuildToolInfoJson(string? author)
+    {
+        var info = new Dictionary<string, object?>
+        {
+            ["tool"] = "ZL2PackBundler",
+            ["version"] = ToolVersion,
+            ["packedAt"] = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz"),
+            ["repo"] = ToolRepoUrl
+        };
+        if (!string.IsNullOrWhiteSpace(author)) info["author"] = author;
+        return System.Text.Json.JsonSerializer.Serialize(info, BundledPackManifest.JsonOptions);
+    }
 
     private const string RuntimeResourceName = "ZL2PackBundler.Core.Bundled.runtime.zip";
 

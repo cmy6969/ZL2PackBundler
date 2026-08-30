@@ -117,6 +117,8 @@ Android SDK 自动探测（环境变量 → 上次记住的目录 → 常见路�
 
 - `manifest.json`（schema=1）：`packId`/`packVersion`/`type`(`snapshot`|`packzip`)/`name`/`author`(可选)/`mcVersion`/`sizeBytes`/`sha256`
 - `--author` 会同时写入 `AndroidManifest.xml` 的 `meta-data zl2packbundler.author`，并显示在首次安装的进度界面（作者信息）
+- `tool-info.json`：打包工具信息（工具名/版本/打包时间/仓库/可选作者），每次打包自动写入；同时写入 `AndroidManifest.xml` 的 `meta-data zl2packbundler.tool/version`
+- 展示位置：打补丁构建路径在启动器「设置-关于」新增「整合包内嵌工具」板块（读取 tool-info.json）；官方原版注入路径在首次安装的进度页脚显示「由 ZL2PackBundler 打包 · 版本 X」
 - `pack.zip`：整合包本体；App 端安装前校验其原始字节 SHA-256，通过后才写入游戏目录
 - 标记文件 `.bundled_pack_version`（内容 `packId:packVersion`）防重复安装，换新包自动重装
 

@@ -32,6 +32,7 @@ import java.util.zip.ZipInputStream;
  */
 public class BundledPackInstaller extends Activity {
     private static final String CONFIG_ASSET = "zl2packbundler/installer-config.json";
+    private static final String TOOL_INFO_ASSET = "zl2packbundler/tool-info.json";
     private static final String MANIFEST_ASSET = "bundled_pack/manifest.json";
     private static final String PACK_ASSET = "bundled_pack/pack.zip";
     private static final String MARKER_FILE = ".bundled_pack_version";
@@ -49,6 +50,7 @@ public class BundledPackInstaller extends Activity {
     private String launcherActivity = "";
     private String importAlias = "";
     private String manifestError = "";
+    private String toolVersion = "";
 
     private static final class Manifest {
         int schema;
@@ -78,6 +80,7 @@ public class BundledPackInstaller extends Activity {
         gameDir = new File(external != null ? external : getFilesDir(), ".minecraft");
 
         readConfig();
+        readToolInfo();
         manifest = readManifest();
 
         if (launcherActivity.isEmpty() || manifest == null || !manifest.valid()) {
@@ -121,6 +124,7 @@ public class BundledPackInstaller extends Activity {
         hint.setTextSize(13f);
         hint.setText("请使用最新版 ZL2PackBundler 重新打包此 APK。");
         root.addView(hint);
+        appendToolFooter(root);
         setContentView(root);
     }
 
@@ -179,7 +183,19 @@ public class BundledPackInstaller extends Activity {
         buttons.addView(continueButton);
         root.addView(buttons);
 
+        appendToolFooter(root);
         setContentView(root);
+    }
+
+    /** 页脚：打包工具信息（由 ZL2PackBundler 写入 assets/zl2packbundler/tool-info.json）。 */
+    private void appendToolFooter(LinearLayout root) {
+        TextView footer = new TextView(this);
+        footer.setTextSize(11f);
+        footer.setTextColor(0xFF9CA3AF);
+        String text = "由 ZL2PackBundler 打包";
+        if (!toolVersion.isEmpty()) text += " · 版本 " + toolVersion;
+        footer.setText(text);
+        root.addView(footer);
     }
 
     private void startInstall() {
@@ -349,6 +365,16 @@ public class BundledPackInstaller extends Activity {
         ui.post(new Runnable() {
             @Override public void run() { statusView.setText(text); }
         });
+    }
+
+    private void readToolInfo() {
+        try {
+            String json = readAsset(TOOL_INFO_ASSET);
+            if (json == null) return;
+            toolVersion = readString(json, "version");
+            if (toolVersion == null) toolVersion = "";
+        } catch (Throwable ignored) {
+        }
     }
 
     private void readConfig() {
