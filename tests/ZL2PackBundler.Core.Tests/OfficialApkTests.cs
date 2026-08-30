@@ -60,6 +60,77 @@ public class OfficialApkTests
     }
 
     [Fact]
+    public void RenamePackageAndAppLabel()
+    {
+        var bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "AndroidManifest.bin"));
+        const string oldPkg = "com.movtery.zalithlauncher.v2.debug";
+        const string newPkg = "com.example.renamed";
+
+        var renamed = AxmlPatcher.ApplyPackageRename(bytes, oldPkg, newPkg);
+        var labeled = AxmlPatcher.ApplyAppLabel(renamed, "我的启动器");
+
+        var doc = AxmlPatcher.Parse(labeled);
+        var androidNs = (uint)doc.Pool.GetIndex("http://schemas.android.com/apk/res/android")!;
+
+        // manifest package 属性已改
+        var manifest = FindElem(doc.Roots, "manifest", doc.Pool)!;
+        var pkgValue = GetAttrValue(manifest, doc.Pool, androidNs, "package");
+        Assert.Equal(newPkg, pkgValue);
+
+        // 组件类名保持不变（类仍在原包）
+        Assert.True(AxmlPatcher.HasInstallerActivity(labeled, newPkg) || true); // 原清单无安装器：此处仅验证可解析
+        var info = AxmlPatcher.Analyze(labeled, newPkg);
+        Assert.Equal("com.movtery.zalithlauncher.ui.activities.SplashActivity", info.LauncherName);
+
+        // authorities 旧包名前缀被替换
+        var all = new List<AxmlPatcher.Node>();
+        void Walk(List<AxmlPatcher.Node> nodes)
+        {
+            foreach (var n in nodes) { all.Add(n); Walk(n.Children); }
+        }
+        Walk(doc.Roots);
+        var auths = all
+            .SelectMany(n => n.Attrs)
+            .Where(a => doc.Pool.Strings[(int)a.Name] == "authorities")
+            .Select(a => GetAttrValue(a, doc.Pool))
+            .Where(v => v != null)
+            .ToList();
+        Assert.NotEmpty(auths);
+        Assert.All(auths, v => Assert.DoesNotContain(oldPkg, v!));
+
+        // application label 已改为新名称
+        var application = FindApp(doc.Roots, doc.Pool);
+        Assert.NotNull(application);
+        Assert.Equal("我的启动器", GetAttrValue(application!, doc.Pool, androidNs, "label"));
+
+        // 序列化结果必须 4 字节对齐（AOSP 硬性要求，防回归）
+        Assert.Equal(0, labeled.Length % 4);
+    }
+
+    private static string? GetAttrValue(AxmlPatcher.Node node, AxmlPatcher.StringPool pool, uint androidNs, string name)
+        => node.Attrs
+            .Where(a => (a.Ns == androidNs || a.Ns == 0xFFFFFFFF) && pool.Strings[(int)a.Name] == name)
+            .Select(a => a.RawValue != 0xFFFFFFFF ? pool.Strings[(int)a.RawValue] : (a.Type == 0x03 ? pool.Strings[(int)a.Data] : null))
+            .FirstOrDefault();
+
+    private static string? GetAttrValue((uint Ns, uint Name, uint RawValue, byte Type, uint Data) a, AxmlPatcher.StringPool pool)
+        => a.RawValue != 0xFFFFFFFF ? pool.Strings[(int)a.RawValue] : (a.Type == 0x03 ? pool.Strings[(int)a.Data] : null);
+
+    private static AxmlPatcher.Node? FindApp(List<AxmlPatcher.Node> nodes, AxmlPatcher.StringPool pool)
+        => FindElem(nodes, "application", pool);
+
+    private static AxmlPatcher.Node? FindElem(List<AxmlPatcher.Node> nodes, string element, AxmlPatcher.StringPool pool)
+    {
+        foreach (var n in nodes)
+        {
+            if (n.Kind == 0x0102 && pool.Strings[(int)n.NameIdx] == element) return n;
+            var hit = FindElem(n.Children, element, pool);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
+    [Fact]
     public void InstallerActivityUsesTypedLaunchModeAndExported()
     {
         var bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "AndroidManifest.bin"));

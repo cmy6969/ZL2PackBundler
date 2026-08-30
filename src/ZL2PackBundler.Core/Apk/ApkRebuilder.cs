@@ -9,6 +9,18 @@ public static class ApkRebuilder
     private static readonly HashSet<string> SignatureSuffixes = new(StringComparer.OrdinalIgnoreCase)
     { ".SF", ".RSA", ".DSA", ".EC" };
 
+    /// <summary>读取 APK 内的单个 zip 条目字节；不存在返回 null。</summary>
+    public static byte[]? ReadEntry(string apkPath, string entryName)
+    {
+        using var zip = ZipFile.OpenRead(apkPath);
+        var entry = zip.GetEntry(entryName);
+        if (entry == null) return null;
+        using var s = entry.Open();
+        using var ms = new MemoryStream();
+        s.CopyTo(ms);
+        return ms.ToArray();
+    }
+
     public static bool ContainsBundledPack(string apkPath)
     {
         using var zip = ZipFile.OpenRead(apkPath);

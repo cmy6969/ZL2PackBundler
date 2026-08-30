@@ -25,7 +25,7 @@ public static class OfficialApkInjector
     public static InjectionResult Inject(
         string baseApk, string workDir, string sdkBuildToolsDir, Action<string>? log = null)
     {
-        var manifestBytes = ReadZipEntry(baseApk, "AndroidManifest.xml")
+        var manifestBytes = ApkRebuilder.ReadEntry(baseApk, "AndroidManifest.xml")
             ?? throw new InvalidDataException("基础 APK 中缺少 AndroidManifest.xml。");
         var packageName = AndroidBuildTools.GetPackageName(baseApk, sdkBuildToolsDir);
 
@@ -51,16 +51,5 @@ public static class OfficialApkInjector
             ManifestOverride = patchedManifest,
             ManifestInfo = info
         };
-    }
-
-    private static byte[]? ReadZipEntry(string apkPath, string entryName)
-    {
-        using var zip = ZipFile.OpenRead(apkPath);
-        var entry = zip.GetEntry(entryName);
-        if (entry == null) return null;
-        using var s = entry.Open();
-        using var ms = new MemoryStream();
-        s.CopyTo(ms);
-        return ms.ToArray();
     }
 }

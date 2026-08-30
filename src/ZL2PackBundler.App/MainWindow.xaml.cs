@@ -137,6 +137,8 @@ public partial class MainWindow : Window
                 PackInput = vm.PackPath,
                 OutputApk = vm.OutputPath,
                 SdkDir = string.IsNullOrWhiteSpace(vm.SdkPath) ? null : vm.SdkPath,
+                PackageName = string.IsNullOrWhiteSpace(vm.PackageName) ? null : vm.PackageName.Trim(),
+                AppName = string.IsNullOrWhiteSpace(vm.AppName) ? null : vm.AppName.Trim(),
                 Signing = new SigningOptions
                 {
                     AutoKeyStore = vm.UseAutoKeyStore,

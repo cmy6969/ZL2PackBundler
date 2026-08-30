@@ -59,6 +59,46 @@ public static class AxmlPatcher
         };
     }
 
+    /// <summary>修改应用包名：manifest package 属性 + 所有 android:authorities 值中的旧包名前缀。</summary>
+    public static byte[] ApplyPackageRename(byte[] manifestBytes, string oldPackage, string newPackage)
+    {
+        var doc = Parse(manifestBytes);
+        var androidNs = (uint)(doc.Pool.GetIndex("http://schemas.android.com/apk/res/android")
+            ?? throw new InvalidDataException("AXML 中缺少 android 命名空间。"));
+        var manifest = FindManifest(doc, androidNs)
+            ?? throw new InvalidDataException("二进制清单中未找到 <manifest>。");
+        SetAttr(manifest, doc.Pool, androidNs, "package", newPackage);
+
+        // 替换 provider authorities 中的旧包名前缀（避免与旧应用同装冲突）
+        foreach (var node in AllNodes(doc.Roots))
+        {
+            for (var i = 0; i < node.Attrs.Count; i++)
+            {
+                var (ns, nameIdx, raw, type, data) = node.Attrs[i];
+                if (ns != androidNs && ns != NoIndex) continue;
+                if (doc.Pool.Strings[(int)nameIdx] != "authorities") continue;
+                var current = GetValue(doc.Pool, raw, type, data);
+                if (current == null || !current.StartsWith(oldPackage, StringComparison.Ordinal)) continue;
+                var renamed = newPackage + current.Substring(oldPackage.Length);
+                var valueIdx = doc.Pool.Intern(renamed);
+                node.Attrs[i] = (ns, nameIdx, valueIdx, TypeString, valueIdx);
+            }
+        }
+        return Serialize(doc);
+    }
+
+    /// <summary>修改应用显示名称：设置/替换 <application> 的 android:label（字符串值）。</summary>
+    public static byte[] ApplyAppLabel(byte[] manifestBytes, string newLabel)
+    {
+        var doc = Parse(manifestBytes);
+        var androidNs = (uint)(doc.Pool.GetIndex("http://schemas.android.com/apk/res/android")
+            ?? throw new InvalidDataException("AXML 中缺少 android 命名空间。"));
+        var application = FindApplication(doc, androidNs)
+            ?? throw new InvalidDataException("二进制清单中未找到 <application>。");
+        SetAttr(application, doc.Pool, androidNs, "label", newLabel);
+        return Serialize(doc);
+    }
+
     /// <summary>摘除原启动组件的 LAUNCHER intent-filter，并追加安装器 Activity；返回修补后的二进制。</summary>
     public static byte[] ApplyPatch(byte[] manifestBytes, string packageHint)
     {
@@ -290,6 +330,41 @@ public static class AxmlPatcher
     private static Node? FindApplication(Document doc, uint androidNs)
         => FindElement(doc, androidNs, node => IsElement(node, "application", androidNs, doc.Pool));
 
+    private static Node? FindManifest(Document doc, uint androidNs)
+        => FindElement(doc, androidNs, node => IsElement(node, "manifest", androidNs, doc.Pool));
+
+    private static IEnumerable<Node> AllNodes(List<Node> roots)
+    {
+        foreach (var r in roots)
+        {
+            yield return r;
+            foreach (var n in AllNodes(r.Children)) yield return n;
+        }
+    }
+
+    /// <summary>设置/替换属性（字符串类型）；缺失时新增。</summary>
+    private static void SetAttr(Node node, StringPool pool, uint androidNs, string name, string value)
+    {
+        var valueIdx = pool.Intern(value);
+        for (var i = 0; i < node.Attrs.Count; i++)
+        {
+            var (ns, nameIdx, _, _, _) = node.Attrs[i];
+            if ((ns == androidNs || ns == NoIndex) && pool.Strings[(int)nameIdx] == name)
+            {
+                node.Attrs[i] = (ns, nameIdx, valueIdx, TypeString, valueIdx);
+                return;
+            }
+        }
+        node.Attrs.Add((androidNs, pool.Intern(name), valueIdx, TypeString, valueIdx));
+    }
+
+    private static string? GetValue(StringPool pool, uint raw, byte type, uint data)
+    {
+        if (raw != NoIndex) return pool.Strings[(int)raw];
+        if (type == TypeString) return pool.Strings[(int)data];
+        return null;
+    }
+
     private static Node? FindElement(Document doc, uint androidNs, Func<Node, bool> predicate)
     {
         Node? Scan(Node n)
@@ -443,6 +518,7 @@ public static class AxmlPatcher
             data.Add(0);
             data.Add(0);
         }
+        while (data.Count % 4 != 0) data.Add(0); // 字符串池整体必须 4 字节对齐（AOSP 强制）
         var header = 28 + 4 * pool.Strings.Count; // 8(头)+20(count/style/flags/ss/sts)+4*count(offsets)
         var total = header + data.Count;
         using var ms = new MemoryStream(total);

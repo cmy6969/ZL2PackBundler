@@ -69,6 +69,10 @@
                     <Button DockPanel.Dock="Right" Content="浏览…" Width="80" Click="OnBrowseOutput"/>
                     <TextBox Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
                 </DockPanel>
+                <TextBlock Text="修改包名（可选，如 com.example.renamed）" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                <TextBox Text="{Binding PackageName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,8"/>
+                <TextBlock Text="修改应用名称（可选）" FontWeight="SemiBold"/>
+                <TextBox Text="{Binding AppName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"/>
                 <Button Content="开始打包" Width="140" Margin="0,16,0,0" Click="OnStartPack"/>
             </StackPanel>
 

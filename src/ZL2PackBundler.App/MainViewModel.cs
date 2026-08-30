@@ -52,6 +52,12 @@ public sealed class MainViewModel : ObservableObject
     private string sdkPath = "";
     public string SdkPath { get => sdkPath; set => Set(ref sdkPath, value); }
 
+    private string packageName = "";
+    public string PackageName { get => packageName; set => Set(ref packageName, value); }
+
+    private string appName = "";
+    public string AppName { get => appName; set => Set(ref appName, value); }
+
     private string keyStorePath = "";
     public string KeyStorePath { get => keyStorePath; set => Set(ref keyStorePath, value); }
 

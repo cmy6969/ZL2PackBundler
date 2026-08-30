@@ -80,6 +80,8 @@ static void Pack(Dictionary<string, string?> o)
         OutputApk = Require(o, "out"),
         Name = o.GetValueOrDefault("name"),
         PackId = o.GetValueOrDefault("pack-id"),
+        PackageName = o.GetValueOrDefault("package"),
+        AppName = o.GetValueOrDefault("app-name"),
         SdkDir = o.GetValueOrDefault("sdk"),
         Force = o.ContainsKey("force"),
         Signing = BuildSigning(o)
@@ -142,10 +144,12 @@ ZL2PackBundler — 把整合包嵌入 ZL2 APK 的 Windows 工具
       识别整合包类型并输出离线完整性报告。
 
   zl2packbundler pack --apk <基础.apk> --pack <文件夹|zip> --out <输出.apk>
-      [--name <名称>] [--pack-id <id>] [--sdk <android-sdk目录>] [--force]
+      [--name <名称>] [--pack-id <id>] [--package <新包名>] [--app-name <新应用名>]
+      [--sdk <android-sdk目录>] [--force]
       [--keystore <path> --ks-pass <密码> --key-alias <别名> --key-pass <密码>]
       [--auto-keystore]
       嵌入整合包 -> zipalign -> apksigner(v2+v3) 重签名。
+      可选修改包名/应用名（如 --package com.example.renamed --app-name "我的启动器"）。
 
   zl2packbundler gen-keystore --out <ks.jks> [--alias <别名>] [--pass <密码>]
       生成一个测试用 keystore（正式分发请使用自有密钥）。

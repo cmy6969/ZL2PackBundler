@@ -13,6 +13,10 @@ public sealed class PackOptions
     public required string OutputApk { get; init; }
     public string? Name { get; init; }
     public string? PackId { get; init; }
+    /// <summary>可选：修改应用包名（如 com.example.renamed）。</summary>
+    public string? PackageName { get; init; }
+    /// <summary>可选：修改应用显示名称。</summary>
+    public string? AppName { get; init; }
     public SigningOptions Signing { get; init; } = new();
     public string? SdkDir { get; init; }
     public bool Force { get; init; }
@@ -104,6 +108,32 @@ public static class PackPipeline
                     };
             }
 
+            // 可选：修改包名 / 应用显示名称（两条路径都生效）
+            if (options.PackageName != null || options.AppName != null)
+            {
+                var pkgRegex = new System.Text.RegularExpressions.Regex(
+                    "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$");
+                var renameManifest = manifestOverride
+                    ?? ApkRebuilder.ReadEntry(options.BaseApk, "AndroidManifest.xml")
+                    ?? throw new InvalidDataException("基础 APK 中缺少 AndroidManifest.xml。");
+
+                var originalPackage = AndroidBuildTools.GetPackageName(options.BaseApk, sdk.BuildToolsDir);
+
+                if (options.PackageName != null)
+                {
+                    if (!pkgRegex.IsMatch(options.PackageName))
+                        throw new InvalidOperationException($"非法包名：{options.PackageName}（示例：com.example.renamed）");
+                    progress?.Invoke($"修改包名：{originalPackage} → {options.PackageName}");
+                    renameManifest = AxmlPatcher.ApplyPackageRename(renameManifest, originalPackage, options.PackageName);
+                }
+                if (options.AppName != null)
+                {
+                    progress?.Invoke($"修改应用名称：{options.AppName}");
+                    renameManifest = AxmlPatcher.ApplyAppLabel(renameManifest, options.AppName);
+                }
+                manifestOverride = renameManifest;
+            }
+
             var rebuilt = Path.Combine(tempDir, "rebuilt.apk");
             progress?.Invoke("重建 APK（嵌入内嵌资产）…");
             ApkRebuilder.Rebuild(baseForEmbedding, rebuilt, manifest.ToJson(), packZip, extraDex, extraAssets, manifestOverride, progress);
@@ -112,6 +142,11 @@ public static class PackPipeline
             if (fixedJsons > 0)
                 warnings.Add(new GuardWarning("info",
                     $"已自动修复 {fixedJsons} 个版本 json 中重复的 libraries 条目（PCL2 等导出的整合包常见，重复库会导致启动游戏时报 Duplicate key）。"));
+            if (options.PackageName != null)
+                warnings.Add(new GuardWarning("info",
+                    "已修改应用包名。注意：文件分享/导入导出类功能（FileProvider authority）可能与代码内常量不一致，如遇相关功能异常属正常；正式分发建议改源码构建期重命名。"));
+            if (options.AppName != null)
+                warnings.Add(new GuardWarning("info", "已修改应用显示名称。"));
 
             progress?.Invoke("zipalign + apksigner 签名…");
             ApkSigner.Run(sdk.BuildToolsDir, rebuilt, options.OutputApk, options.Signing, progress);
