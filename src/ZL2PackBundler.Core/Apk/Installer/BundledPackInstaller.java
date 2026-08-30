@@ -381,18 +381,36 @@ public class BundledPackInstaller extends Activity {
         }
     }
 
-    /** 极简 JSON 字段读取（只取字符串值，不做转义，避免正则/依赖）。 */
-    private static String readString(String json, String key) {
+    /** 极简 JSON 字段读取（字符串与数字都支持；不做完整转义，避免正则/依赖）。 */
+    static String readString(String json, String key) {
         String marker = "\"" + key + "\"";
         int keyIdx = json.indexOf(marker);
         if (keyIdx < 0) return null;
         int colon = json.indexOf(':', keyIdx + marker.length());
         if (colon < 0) return null;
-        int q1 = json.indexOf('"', colon + 1);
-        if (q1 < 0) return null;
-        int q2 = json.indexOf('"', q1 + 1);
-        if (q2 < 0) return null;
-        return json.substring(q1 + 1, q2);
+        int p = colon + 1;
+        while (p < json.length() && (json.charAt(p) == ' ' || json.charAt(p) == '\r'
+                || json.charAt(p) == '\n' || json.charAt(p) == '\t')) p++;
+        if (p >= json.length()) return null;
+        if (json.charAt(p) == '"') {
+            StringBuilder sb = new StringBuilder();
+            for (int i = p + 1; i < json.length(); i++) {
+                char c = json.charAt(i);
+                if (c == '\\' && i + 1 < json.length()) { // 转义
+                    char n = json.charAt(i + 1);
+                    if (n == '"' || n == '\\') { sb.append(n); i++; continue; }
+                }
+                if (c == '"') break;
+                sb.append(c);
+            }
+            return sb.toString();
+        }
+        // 数字/布尔等裸值：取到逗号或花括号为止
+        int end = p;
+        while (end < json.length() && json.charAt(end) != ',' && json.charAt(end) != '}'
+                && json.charAt(end) != '\r' && json.charAt(end) != '\n') end++;
+        String token = json.substring(p, end).trim();
+        return token.isEmpty() ? null : token;
     }
 
     private static int parseIntSafe(String s, int def) {
