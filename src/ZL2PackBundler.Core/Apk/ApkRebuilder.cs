@@ -23,6 +23,7 @@ public static class ApkRebuilder
     public static void Rebuild(string baseApk, string outputApk, string manifestJson, string packZipPath,
         IReadOnlyList<(string EntryName, string FilePath)>? extraDexEntries = null,
         IReadOnlyList<(string EntryName, byte[] Content)>? extraAssetEntries = null,
+        byte[]? manifestOverride = null,
         Action<string>? progress = null)
     {
         using var source = ZipFile.OpenRead(baseApk);
@@ -36,7 +37,8 @@ public static class ApkRebuilder
         {
             if (IsSignatureEntry(entry.FullName)
                 || string.Equals(entry.FullName, BundledPackManifest.ManifestAssetPath, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(entry.FullName, BundledPackManifest.PackZipAssetPath, StringComparison.OrdinalIgnoreCase))
+                || string.Equals(entry.FullName, BundledPackManifest.PackZipAssetPath, StringComparison.OrdinalIgnoreCase)
+                || (manifestOverride != null && string.Equals(entry.FullName, "AndroidManifest.xml", StringComparison.OrdinalIgnoreCase)))
             {
                 done++;
                 continue;
@@ -51,6 +53,14 @@ public static class ApkRebuilder
             src.CopyTo(dst);
             done++;
             if (done % 500 == 0) progress?.Invoke($"复制 APK 条目 {done}/{total}");
+        }
+
+        if (manifestOverride != null)
+        {
+            progress?.Invoke("写入修补后的 AndroidManifest.xml");
+            var manifestXmlEntry = dest.CreateEntry("AndroidManifest.xml", CompressionLevel.NoCompression);
+            using var dst = manifestXmlEntry.Open();
+            dst.Write(manifestOverride);
         }
 
         if (extraDexEntries != null)

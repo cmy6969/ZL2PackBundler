@@ -1,10 +1,9 @@
-# 生成便携运行时 zip（jre + apktool + zipalign + aapt2 + apksigner）
+# 生成便携运行时 zip（jre + zipalign + aapt2 + apksigner）
 # 用法（PowerShell）：
 #   powershell -ExecutionPolicy Bypass -File scripts/build-bundled-runtime.ps1 `
-#     -ApktoolJar <apktool_2.9.3.jar> -BuildTools <sdk/build-tools/36.1.0> -JdkHome <jdk17>
+#     -BuildTools <sdk/build-tools/36.1.0> -JdkHome <jdk17>
 # 输出：src/ZL2PackBundler.Core/Bundled/runtime.zip（gitignored）
 param(
-    [Parameter(Mandatory = $true)][string]$ApktoolJar,
     [Parameter(Mandatory = $true)][string]$BuildTools,
     [Parameter(Mandatory = $true)][string]$JdkHome
 )
@@ -26,7 +25,6 @@ New-Item -ItemType Directory -Path $stage | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "jlink failed" }
 
 # 2) 工具二进制
-Copy-Item $ApktoolJar (Join-Path $stage "apktool.jar")
 Copy-Item (Join-Path $BuildTools "zipalign.exe") $stage
 Copy-Item (Join-Path $BuildTools "aapt2.exe") $stage
 New-Item -ItemType Directory -Path (Join-Path $stage "lib") | Out-Null

@@ -47,12 +47,12 @@ docs/                         设计规格 / 实施计划 / ADR
 
 **源码构建/开发**：
 - Windows 10/11，.NET 8 SDK
-- JDK 17 与 Android SDK build-tools（未内嵌便携运行时 `runtime.zip` 时使用；`zipalign`/`aapt2`/`apksigner` 需要 build-tools，apktool 首次联网下载缓存于 `%APPDATA%\ZL2PackBundler\tools`）
+- JDK 17 与 Android SDK build-tools（未内嵌便携运行时 `runtime.zip` 时使用；需要 `zipalign`/`aapt2`/`apksigner`，均来自 build-tools）
 - 自行构建带补丁的 ZL2 另需 Android SDK + Gradle（可选，见下）
 
 ## 下载使用（Releases 便携版）
 
-从 [Releases](../../releases) 下载单个 exe 双击即用，**无需安装 .NET/JDK/Android SDK**（内置精简 JRE、apktool、zipalign/aapt2/apksigner，首次运行自动解包）：
+从 [Releases](../../releases) 下载单个 exe 双击即用，**无需安装 .NET/JDK/Android SDK**（内置精简 JRE、zipalign/aapt2/apksigner，首次运行自动解包）：
 
 - `ZL2PackBundler.App.exe` — 图形界面（四步向导）
 - `zl2packbundler.exe` — 命令行
@@ -68,7 +68,7 @@ bash scripts/integration-test.sh               # 端到端：嵌入→签名→�
 
 # 便携运行时内嵌（否则开发构建回退使用本机 JDK/Android SDK）
 powershell -ExecutionPolicy Bypass -File scripts/build-bundled-runtime.ps1 `
-  -ApktoolJar <apktool.jar> -BuildTools <sdk/build-tools/36.1.0> -JdkHome <jdk17>
+  -BuildTools <sdk/build-tools/36.1.0> -JdkHome <jdk17>
 
 # 单文件发布
 dotnet publish src/ZL2PackBundler.App -c Release -r win-x64 --self-contained true `
@@ -141,7 +141,7 @@ Android SDK 自动探测（环境变量 → 上次记住的目录 → 常见路�
 ## 常见问题
 
 - **报“未找到 Android SDK build-tools”**：`--sdk <SDK目录>` 指定一次（GUI 里选择一次）即被记住；或设置 `ANDROID_HOME`。
-- **官方原版 APK 首次打包很慢**：需要联网下载 apktool（仅首次，约 22MB）并对 APK 做一次解码/重建（视 APK 大小需数分钟），后续复用缓存；也支持直接选用打补丁构建的 APK 跳过注入。
+- **官方原版 APK 注入很快且无损**：直接二进制修补 AndroidManifest.xml 并替换 zip 条目，不经过 apktool、不重建资源，原 APK 的 resources.arsc 与全部资源文件逐字节保留；也支持直接选用打补丁构建的 APK 跳过注入。
 - **装机后无进度条/无版本**：官方原版路径看是否出现「正在安装内嵌整合包」界面；打补丁构建路径确认日志中有 `Bundled modpack manifest loaded`（旧版工具产出的大小写 `type` 已修复，请用最新版重新打包）。
 - **包体过大**：参考体积护栏；正式渠道分发请评估 Play 等渠道的包体积限制。
 

@@ -78,6 +78,7 @@ public static class PackPipeline
             BaseApkKind baseApkKind;
             List<(string EntryName, string FilePath)>? extraDex = null;
             List<(string EntryName, byte[] Content)>? extraAssets = null;
+            byte[]? manifestOverride = null;
             if (OfficialApkDetector.IsPatchedBuild(options.BaseApk))
             {
                 baseForEmbedding = options.BaseApk;
@@ -89,8 +90,9 @@ public static class PackPipeline
                 progress?.Invoke("基础 APK 为官方原版，开始注入安装器…");
                 var injection = OfficialApkInjector.Inject(
                     options.BaseApk, tempDir, sdk.BuildToolsDir, progress);
-                baseForEmbedding = injection.BaseApkPath;
+                baseForEmbedding = options.BaseApk;
                 baseApkKind = BaseApkKind.OfficialInjected;
+                manifestOverride = injection.ManifestOverride;
                 if (injection.DexEntryName != null && injection.DexFilePath != null)
                     extraDex = new List<(string, string)> { (injection.DexEntryName, injection.DexFilePath) };
                 if (injection.InstallerConfigJson != null)
@@ -103,7 +105,7 @@ public static class PackPipeline
 
             var rebuilt = Path.Combine(tempDir, "rebuilt.apk");
             progress?.Invoke("重建 APK（嵌入内嵌资产）…");
-            ApkRebuilder.Rebuild(baseForEmbedding, rebuilt, manifest.ToJson(), packZip, extraDex, extraAssets, progress);
+            ApkRebuilder.Rebuild(baseForEmbedding, rebuilt, manifest.ToJson(), packZip, extraDex, extraAssets, manifestOverride, progress);
 
             var warnings = Guards.Check(packBytes, new FileInfo(rebuilt).Length);
 

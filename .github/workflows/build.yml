@@ -29,15 +29,10 @@ jobs:
         with:
           packages: 'build-tools;36.0.0'
 
-      - name: Download apktool
-        run: |
-          curl.exe -L --fail --retry 3 -o apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.9.3/apktool_2.9.3.jar
-
-      - name: Build portable runtime (JRE + apktool + signing tools)
+      - name: Build portable runtime (JRE + signing tools)
         shell: pwsh
         run: |
           powershell -ExecutionPolicy Bypass -File scripts/build-bundled-runtime.ps1 `
-            -ApktoolJar apktool.jar `
             -BuildTools "$env:ANDROID_HOME\build-tools\36.0.0" `
             -JdkHome "$env:JAVA_HOME"
 

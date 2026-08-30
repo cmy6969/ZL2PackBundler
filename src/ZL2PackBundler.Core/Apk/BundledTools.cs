@@ -91,14 +91,6 @@ public static class BundledTools
             : null;
     }
 
-    /// <summary>apktool.jar：便携运行时优先，其次已缓存下载，最后联网下载。</summary>
-    public static string? TryLocateBundledApktool(Action<string>? log = null)
-    {
-        if (!HasEmbeddedRuntime()) return null;
-        var jar = Path.Combine(EnsureRuntime(log), "apktool.jar");
-        return File.Exists(jar) ? jar : null;
-    }
-
     /// <summary>内嵌的预编译安装器 dex 写入 workDir，返回路径。</summary>
     public static string ExtractInstallerDex(string workDir, Action<string>? log = null)
     {
