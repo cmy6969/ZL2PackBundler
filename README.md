@@ -105,7 +105,7 @@ dotnet publish src/ZL2PackBundler.App -c Release -r win-x64 --self-contained tru
 ```
 zl2packbundler analyze --pack <文件夹|zip>     # 识别格式 + 离线完整性报告
 zl2packbundler pack --apk <a.apk> --pack <包> --out <o.apk>
-     [--name 名称] [--pack-id id] [--package 新包名] [--app-name 新应用名] [--author 作者信息]
+     [--name 名称] [--pack-id id] [--package 新包名] [--app-name 新应用名] [--author 作者信息] [--icon 图标.png]
      [--sdk SDK目录] [--force]
      [--keystore ks --ks-pass pw --key-alias a --key-pass pw] [--auto-keystore]
 zl2packbundler gen-keystore --out ks.jks [--alias a] [--pass pw]
@@ -140,7 +140,8 @@ Android SDK 自动探测（环境变量 → 上次记住的目录 → 常见路�
 
 - 本工具与 `android/` 下的接入代码均为 GPL-3.0（[LICENSE](LICENSE)）；Android 补丁文件源自 ZalithLauncher2（Copyright (C) 2025 MovTery 及贡献者），版权声明已保留。
 - 分发内嵌整合包的修改版 ZL2 时，须遵守 ZL2 的 GPLv3 附加条款：构建期在 `ZalithLauncher/gradle.properties` 重命名（不得含 “ZalithLauncher”/“ZL”）、启动页标注“非官方修改版”、保留版权声明。
-- 本工具不自动改名、不改图标；可在打包时**手动指定** `--package`（包名）与 `--app-name`（应用名）。注意：改包名后文件分享/导入导出类功能（FileProvider authority）可能与代码内常量不一致，正式分发仍建议在源码构建期（`gradle.properties`）重命名。
+- 本工具默认不改名、不改图标；可在打包时**手动指定** `--package`（包名）、`--app-name`（应用名）与 `--icon`（桌面图标）。注意：改包名后文件分享/导入导出类功能（FileProvider authority）可能与代码内常量不一致，正式分发仍建议在源码构建期（`gradle.properties`）重命名。
+- 图标替换：`--icon <png|jpg|webp>` 会把各密度桶的 mipmap 位图（webp/png）按原始尺寸缩放替换，并移除 anydpi 自适应图标 XML（Android 8+ 桌面回退到替换后的位图，代价是失去系统「主题化图标」特性）。纯矢量图标（无位图桶）的 APK 无法替换，会提示跳过。
 
 ## 常见问题
 

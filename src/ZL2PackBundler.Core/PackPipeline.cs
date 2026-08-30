@@ -19,6 +19,8 @@ public sealed class PackOptions
     public string? AppName { get; init; }
     /// <summary>可选：作者信息（写入 manifest.json 的 author 字段 + AndroidManifest meta-data）。</summary>
     public string? Author { get; init; }
+    /// <summary>可选：替换应用图标（PNG/JPG/WebP，按各密度桶原始尺寸缩放替换）。</summary>
+    public string? IconPng { get; init; }
     public SigningOptions Signing { get; init; } = new();
     public string? SdkDir { get; init; }
     public bool Force { get; init; }
@@ -119,8 +121,7 @@ public static class PackPipeline
                 .ToList();
 
             // 可选：修改包名 / 应用显示名称 / 写入作者信息；并始终写入打包工具 meta-data（两条路径都生效）
-            {
-                var pkgRegex = new System.Text.RegularExpressions.Regex(
+            var pkgRegex = new System.Text.RegularExpressions.Regex(
                     "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$");
                 var renameManifest = manifestOverride
                     ?? ApkRebuilder.ReadEntry(options.BaseApk, "AndroidManifest.xml")
@@ -147,14 +148,48 @@ public static class PackPipeline
                 progress?.Invoke($"写入打包工具信息：ZL2PackBundler {BundledTools.ToolVersion}");
                 renameManifest = AxmlPatcher.ApplyMetaData(renameManifest, "zl2packbundler.tool", "ZL2PackBundler");
                 renameManifest = AxmlPatcher.ApplyMetaData(renameManifest, "zl2packbundler.version", BundledTools.ToolVersion);
-                manifestOverride = renameManifest;
+            manifestOverride = renameManifest;
+
+            // 可选：替换应用图标（位图条目按原始尺寸替换；移除 anydpi 自适应图标 XML 强制回退位图）
+            Dictionary<string, byte[]?>? iconOverrides = null;
+            string? iconSummary = null;
+            var iconWarnings = new List<GuardWarning>();
+            if (options.IconPng != null)
+            {
+                progress?.Invoke("替换应用图标…");
+                var arsc = ApkRebuilder.ReadEntry(options.BaseApk, "resources.arsc")
+                    ?? throw new InvalidDataException("基础 APK 缺少 resources.arsc，无法解析图标资源。");
+                var entryNames = new List<string>();
+                using (var zip = System.IO.Compression.ZipFile.OpenRead(options.BaseApk))
+                    foreach (var e in zip.Entries) entryNames.Add(e.FullName);
+                var iconReport = IconPatcher.Apply(renameManifest, arsc,
+                    name => ApkRebuilder.ReadEntry(options.BaseApk, name),
+                    entryNames, options.IconPng, out iconOverrides);
+                if (iconReport.Changed)
+                {
+                    iconSummary =
+                        $"已替换 {iconReport.Replaced.Count} 个图标文件" +
+                        (iconReport.Removed.Count > 0
+                            ? $"（并移除 {iconReport.Removed.Count} 个自适应图标 XML，桌面将使用替换后的位图图标）"
+                            : "");
+                    iconWarnings.Add(new GuardWarning("info", "图标：" + iconSummary));
+                    foreach (var skip in iconReport.Skipped)
+                        iconWarnings.Add(new GuardWarning("warn", "图标跳过：" + skip));
+                }
+                else
+                {
+                    iconSummary = "未找到可替换的图标条目：" + string.Join("；", iconReport.Skipped);
+                    iconWarnings.Add(new GuardWarning("warn", "图标：" + iconSummary));
+                }
             }
 
             var rebuilt = Path.Combine(tempDir, "rebuilt.apk");
             progress?.Invoke("重建 APK（嵌入内嵌资产）…");
-            ApkRebuilder.Rebuild(baseForEmbedding, rebuilt, manifest.ToJson(), packZip, extraDex, extraAssets, manifestOverride, progress);
+            ApkRebuilder.Rebuild(baseForEmbedding, rebuilt, manifest.ToJson(), packZip, extraDex, extraAssets,
+                manifestOverride, progress, iconOverrides);
 
             var warnings = Guards.Check(packBytes, new FileInfo(rebuilt).Length);
+            warnings.AddRange(iconWarnings);
             if (fixedJsons > 0)
                 warnings.Add(new GuardWarning("info",
                     $"已自动修复 {fixedJsons} 个版本 json 中重复的 libraries 条目（PCL2 等导出的整合包常见，重复库会导致启动游戏时报 Duplicate key）。"));
@@ -175,7 +210,7 @@ public static class PackPipeline
 
             return new PackReport(
                 analysis.Type, analysis.Format, baseApkKind, name, options.Author, analysis.McVersion,
-                packBytes, new FileInfo(options.OutputApk).Length, options.OutputApk,
+                iconSummary, packBytes, new FileInfo(options.OutputApk).Length, options.OutputApk,
                 analysis.OfflineReport, warnings, cert);
         }
         finally

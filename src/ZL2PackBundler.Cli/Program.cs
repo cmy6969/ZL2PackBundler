@@ -83,6 +83,7 @@ static void Pack(Dictionary<string, string?> o)
         PackageName = o.GetValueOrDefault("package"),
         AppName = o.GetValueOrDefault("app-name"),
         Author = o.GetValueOrDefault("author"),
+        IconPng = o.GetValueOrDefault("icon"),
         SdkDir = o.GetValueOrDefault("sdk"),
         Force = o.ContainsKey("force"),
         Signing = BuildSigning(o)
@@ -95,6 +96,7 @@ static void Pack(Dictionary<string, string?> o)
     Console.WriteLine($"类型: {report.Type} / 格式: {report.Format}");
     Console.WriteLine($"名称: {report.Name} / MC: {report.McVersion ?? "-"}");
     if (report.Author != null) Console.WriteLine($"作者: {report.Author}");
+    if (report.IconSummary != null) Console.WriteLine($"图标: {report.IconSummary}");
     Console.WriteLine($"pack.zip: {report.PackZipBytes / (1024.0 * 1024.0):F1} MB");
     Console.WriteLine($"最终 APK: {report.FinalApkBytes / (1024.0 * 1024.0):F1} MB");
     foreach (var w in report.Warnings)
@@ -104,7 +106,7 @@ static void Pack(Dictionary<string, string?> o)
             Console.WriteLine($"提示：{item.Path} 缺失，首次启动将联网补齐（{item.Label}）。");
     Console.WriteLine($"输出: {report.OutputPath}");
     Console.WriteLine();
-    Console.WriteLine("合规提示：本工具不修改应用名称/图标。分发修改版 ZalithLauncher 须遵守 GPLv3 附加条款：");
+    Console.WriteLine("合规提示：本工具默认不修改应用名称/图标（可选 --icon 替换桌面图标）。分发修改版 ZalithLauncher 须遵守 GPLv3 附加条款：");
     Console.WriteLine("  1) 在构建期用 gradle.properties 的 launcher_name 重命名，并在启动页/主界面标注非官方修改版；");
     Console.WriteLine("  2) 不得移除版权声明。详见仓库 README_ZH_CN.md。");
 }
@@ -148,6 +150,7 @@ ZL2PackBundler — 把整合包嵌入 ZL2 APK 的 Windows 工具
   zl2packbundler pack --apk <基础.apk> --pack <文件夹|zip> --out <输出.apk>
       [--name <名称>] [--pack-id <id>] [--package <新包名>] [--app-name <新应用名>]
       [--author <作者信息>]
+      [--icon <图标.png|jpg|webp>]
       [--sdk <android-sdk目录>] [--force]
       [--keystore <path> --ks-pass <密码> --key-alias <别名> --key-pass <密码>]
       [--auto-keystore]
@@ -155,6 +158,8 @@ ZL2PackBundler — 把整合包嵌入 ZL2 APK 的 Windows 工具
       可选修改包名/应用名（如 --package com.example.renamed --app-name "我的启动器"）。
       --author 会把作者信息写入 manifest.json 的 author 字段与 AndroidManifest 的
       meta-data zl2packbundler.author（安装页也会显示）。
+      --icon 替换桌面图标：按各密度桶原始尺寸缩放替换 mipmap 位图（webp/png），
+      并移除 anydpi 自适应图标 XML（桌面回退到替换后的位图图标）。
 
   zl2packbundler gen-keystore --out <ks.jks> [--alias <别名>] [--pass <密码>]
       生成一个测试用 keystore（正式分发请使用自有密钥）。

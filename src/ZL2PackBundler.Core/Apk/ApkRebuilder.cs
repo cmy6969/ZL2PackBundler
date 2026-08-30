@@ -36,7 +36,8 @@ public static class ApkRebuilder
         IReadOnlyList<(string EntryName, string FilePath)>? extraDexEntries = null,
         IReadOnlyList<(string EntryName, byte[] Content)>? extraAssetEntries = null,
         byte[]? manifestOverride = null,
-        Action<string>? progress = null)
+        Action<string>? progress = null,
+        IReadOnlyDictionary<string, byte[]?>? entryOverrides = null)
     {
         using var source = ZipFile.OpenRead(baseApk);
         using var dest = new ZipArchive(
@@ -52,6 +53,22 @@ public static class ApkRebuilder
                 || string.Equals(entry.FullName, BundledPackManifest.PackZipAssetPath, StringComparison.OrdinalIgnoreCase)
                 || (manifestOverride != null && string.Equals(entry.FullName, "AndroidManifest.xml", StringComparison.OrdinalIgnoreCase)))
             {
+                done++;
+                continue;
+            }
+
+            if (entryOverrides != null && entryOverrides.TryGetValue(entry.FullName, out var replacement))
+            {
+                if (replacement == null)
+                {
+                    progress?.Invoke("移除条目：" + entry.FullName);
+                }
+                else
+                {
+                    var overrideEntry = dest.CreateEntry(entry.FullName, CompressionLevel.Optimal);
+                    using var overrideStream = overrideEntry.Open();
+                    overrideStream.Write(replacement);
+                }
                 done++;
                 continue;
             }

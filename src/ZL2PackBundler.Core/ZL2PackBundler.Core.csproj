@@ -4,8 +4,13 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 图标处理：解码常见图片格式 + 缩放 + WebP/PNG 编码 -->
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="ZL2PackBundler.Core.Tests" />

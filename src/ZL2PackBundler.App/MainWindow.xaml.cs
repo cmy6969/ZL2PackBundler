@@ -73,6 +73,14 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog(this) == true) vm.PackPath = dlg.FileName;
     }
 
+    private void OnBrowseIcon(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog { Filter = "图片文件 (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp|所有文件 (*.*)|*.*" };
+        if (dlg.ShowDialog(this) == true) vm.IconPath = dlg.FileName;
+    }
+
+    private void OnClearIcon(object sender, RoutedEventArgs e) => vm.IconPath = "";
+
     private void OnBrowseSdk(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFolderDialog { Title = "选择 Android SDK 根目录（含 build-tools 的目录）" };
@@ -140,6 +148,7 @@ public partial class MainWindow : Window
                 PackageName = string.IsNullOrWhiteSpace(vm.PackageName) ? null : vm.PackageName.Trim(),
                 AppName = string.IsNullOrWhiteSpace(vm.AppName) ? null : vm.AppName.Trim(),
                 Author = string.IsNullOrWhiteSpace(vm.Author) ? null : vm.Author.Trim(),
+                IconPng = string.IsNullOrWhiteSpace(vm.IconPath) ? null : vm.IconPath.Trim(),
                 Signing = new SigningOptions
                 {
                     AutoKeyStore = vm.UseAutoKeyStore,
@@ -156,11 +165,12 @@ public partial class MainWindow : Window
                 $"=== 打包完成 ===\n类型: {report.Type} / 格式: {report.Format}\n" +
                 $"名称: {report.Name} / MC: {report.McVersion ?? "-"}\n" +
                 (report.Author != null ? $"作者: {report.Author}\n" : "") +
+                (report.IconSummary != null ? $"图标: {report.IconSummary}\n" : "") +
                 $"pack.zip: {report.PackZipBytes / (1024.0 * 1024.0):F1} MB\n" +
                 $"最终 APK: {report.FinalApkBytes / (1024.0 * 1024.0):F1} MB\n" +
                 string.Join("\n", report.Warnings.Select(w => $"[{w.Level}] {w.Message}")) + "\n" +
                 "输出: " + report.OutputPath + "\n\n" +
-                "合规提示：本工具不修改应用名称/图标。分发修改版 ZalithLauncher 须遵守 GPLv3 附加条款：\n" +
+                "合规提示：本工具默认不修改应用名称/图标（可选图标替换）。分发修改版 ZalithLauncher 须遵守 GPLv3 附加条款：\n" +
                 "1) 构建期用 gradle.properties 的 launcher_name 重命名并在启动页标注非官方修改版；\n" +
                 "2) 不得移除版权声明。详见仓库 README_ZH_CN.md。\n" + vm.LogText;
         }

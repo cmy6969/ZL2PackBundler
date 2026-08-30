@@ -12,6 +12,7 @@ public sealed record PackReport(
     string Name,
     string? Author,
     string? McVersion,
+    string? IconSummary,
     long PackZipBytes,
     long FinalApkBytes,
     string OutputPath,

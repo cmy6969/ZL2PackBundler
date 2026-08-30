@@ -39,6 +39,25 @@ public static class AxmlPatcher
     public static bool HasInstallerActivity(byte[] manifestBytes, string packageHint)
         => Analyze(manifestBytes, packageHint).LauncherName == InstallerActivityName;
 
+    /// <summary>查找 &lt;application&gt; 节点（供 IconPatcher 等使用）。</summary>
+    internal static Node FindApplicationNode(Document doc, uint androidNs)
+        => FindApplication(doc, androidNs)
+           ?? throw new InvalidDataException("二进制清单中未找到 <application>。");
+
+    /// <summary>读取属性中的资源引用 ID（类型 0x01）；不是引用时返回 null。</summary>
+    internal static uint? GetAttrReference(Node node, StringPool pool, uint androidNs, string name)
+    {
+        if (node.Kind != ResXmlStartElement) return null;
+        foreach (var (ns, nameIdx, _, type, data) in node.Attrs)
+        {
+            if ((ns == androidNs || ns == NoIndex)
+                && pool.Strings[(int)nameIdx] == name
+                && type == 0x01 /* TYPE_REFERENCE */)
+                return data;
+        }
+        return null;
+    }
+
     /// <summary>分析二进制清单：包名、启动组件、导入别名（不做修改）。</summary>
     public static AxmlInfo Analyze(byte[] manifestBytes, string packageHint)
     {

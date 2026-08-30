@@ -75,6 +75,12 @@
                 <TextBox Text="{Binding AppName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"/>
                 <TextBlock Text="作者信息（可选，写入 APK 的 manifest.json 与 AndroidManifest meta-data）" FontWeight="SemiBold" Margin="0,12,0,0"/>
                 <TextBox Text="{Binding Author, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"/>
+                <TextBlock Text="应用图标（可选，PNG/JPG/WebP；按各密度桶尺寸缩放替换，并移除自适应图标 XML）" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                <DockPanel Margin="0,4,0,0">
+                    <Button DockPanel.Dock="Right" Content="浏览…" Width="80" Click="OnBrowseIcon"/>
+                    <Button DockPanel.Dock="Right" Content="清除" Width="60" Margin="0,0,8,0" Click="OnClearIcon"/>
+                    <TextBox Text="{Binding IconPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
+                </DockPanel>
                 <Button Content="开始打包" Width="140" Margin="0,16,0,0" Click="OnStartPack"/>
             </StackPanel>
 
