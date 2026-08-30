@@ -1,0 +1,96 @@
+using System.Diagnostics;
+
+namespace ZL2PackBundler.Core.Signing;
+
+public sealed class SigningOptions
+{
+    public string? KeyStorePath { get; set; }
+    public string? KeyStorePassword { get; set; }
+    public string? KeyAlias { get; set; }
+    public string? KeyPassword { get; set; }
+    public bool AutoKeyStore { get; set; }
+    public string? AutoKeyStoreDir { get; set; }
+}
+
+public static class ApkSigner
+{
+    public const string AutoKeyStorePassword = "zl2packbundler"; // 默认密钥：仅用于测试分发
+
+    public static string Run(string sdkBuildToolsDir, string apkPath, string outputPath,
+        SigningOptions options, Action<string>? log = null)
+    {
+        var aligned = outputPath + ".aligned.tmp";
+        RunTool(Path.Combine(sdkBuildToolsDir, "zipalign.exe"),
+            new[] { "-p", "-f", "4", apkPath, aligned }, log);
+
+        var ks = options.KeyStorePath;
+        if (ks == null && options.AutoKeyStore)
+            ks = KeyStoreGenerator.Create(
+                Path.Combine(options.AutoKeyStoreDir ?? Directory.GetCurrentDirectory(), "zl2packbundler.keystore"), log: log);
+        if (ks == null)
+            throw new InvalidOperationException("未配置 keystore（使用 --keystore 或 --auto-keystore）。");
+
+        var java = LocateJava();
+        var args = new List<string>
+        {
+            "-jar", Path.Combine(sdkBuildToolsDir, "lib", "apksigner.jar"), "sign",
+            "--ks", ks,
+            "--ks-pass", "pass:" + (options.KeyStorePassword ?? AutoKeyStorePassword),
+            "--v1-signing-enabled", "false",
+            "--v2-signing-enabled", "true",
+            "--v3-signing-enabled", "true",
+            "--min-sdk-version", "26", // ZL2 最低 API 26；伪 APK/异常清单时作为签名方案判定的回退值
+            "--out", outputPath
+        };
+        if (!string.IsNullOrEmpty(options.KeyAlias)) { args.Add("--ks-key-alias"); args.Add(options.KeyAlias); }
+        if (!string.IsNullOrEmpty(options.KeyPassword)) { args.Add("--key-pass"); args.Add("pass:" + options.KeyPassword); }
+        args.Add(aligned);
+
+        RunTool(java, args, log);
+        try { File.Delete(aligned); } catch { /* 临时文件清理尽力而为 */ }
+        return ks;
+    }
+
+    public static string Verify(string sdkBuildToolsDir, string apkPath, Action<string>? log = null)
+    {
+        return RunToolCaptured(LocateJava(),
+            new[] { "-jar", Path.Combine(sdkBuildToolsDir, "lib", "apksigner.jar"),
+                    "verify", "--verbose", "--print-certs", "--min-sdk-version", "26", apkPath }, log);
+    }
+
+    public static string LocateJava()
+    {
+        var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
+        if (!string.IsNullOrEmpty(javaHome))
+        {
+            var p = Path.Combine(javaHome, "bin", "java.exe");
+            if (File.Exists(p)) return p;
+        }
+        return "java";
+    }
+
+    private static void RunTool(string fileName, IEnumerable<string> args, Action<string>? log)
+        => RunToolCaptured(fileName, args, log);
+
+    private static string RunToolCaptured(string fileName, IEnumerable<string> args, Action<string>? log)
+    {
+        var psi = new ProcessStartInfo(fileName)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException($"无法启动 {fileName}");
+        var stdout = p.StandardOutput.ReadToEnd();
+        var stderr = p.StandardError.ReadToEnd();
+        p.WaitForExit();
+        log?.Invoke(stdout);
+        if (!string.IsNullOrWhiteSpace(stderr)) log?.Invoke(stderr);
+        if (p.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"{Path.GetFileName(fileName)} 退出码 {p.ExitCode}：\n{stdout}\n{stderr}");
+        return stdout + stderr;
+    }
+}

@@ -1,0 +1,13 @@
+# .NET 构建产物
+**/bin/
+**/obj/
+.vs/
+
+# 集成测试临时目录与产物
+.tmp/
+*.apk
+*.apk.idsig
+
+# 本地密钥（切勿提交任何 keystore）
+*.keystore
+*.jks

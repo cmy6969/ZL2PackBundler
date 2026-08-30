@@ -1,0 +1,574 @@
+diff --git a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/components/BundledModpackTask.kt b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/components/BundledModpackTask.kt
+new file mode 100644
+index 00000000..fd0f02e7
+--- /dev/null
++++ b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/components/BundledModpackTask.kt
+@@ -0,0 +1,168 @@
++/*
++ * Zalith Launcher 2
++ * Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
++ * (GPL-3.0，见仓库 LICENSE)
++ */
++package com.movtery.zalithlauncher.components
++
++import android.content.Context
++import android.os.StatFs
++import com.movtery.zalithlauncher.game.download.modpack.install.BUNDLED_PACK_MARKER_FILE
++import com.movtery.zalithlauncher.game.download.modpack.install.BUNDLED_PACK_ZIP_ASSET
++import com.movtery.zalithlauncher.game.download.modpack.install.BundledModpackManifest
++import com.movtery.zalithlauncher.game.path.GamePathManager
++import com.movtery.zalithlauncher.game.version.installed.VersionsManager
++import com.movtery.zalithlauncher.path.PathManager
++import com.movtery.zalithlauncher.utils.logging.Logger
++import java.io.File
++import java.io.FileInputStream
++import java.security.MessageDigest
++import java.util.zip.ZipInputStream
++
++private const val TAG = "BundledModpackTask"
++
++/**
++ * 内嵌整合包安装任务（splash 解包组件之一）。
++ * snapshot：解包到默认游戏目录并写标记；packzip：复制到缓存供 ModpackImporter 导入。
++ */
++class BundledModpackTask(private val context: Context) : AbstractUnpackTask() {
++
++    val manifest: BundledModpackManifest? = BundledModpackManifest.load(context)
++
++    /** packzip 模式导入所需的缓存文件（SplashActivity 在任务完成后读取并转发给 MainActivity）。 */
++    var pendingImportFile: File? = null
++        private set
++
++    private val markerFile: File
++        get() = File(GamePathManager.getCurrentPath(), BUNDLED_PACK_MARKER_FILE)
++
++    /** 与 UnpackSingleTask.isCheckFailed 同语义：资产缺失/非法时跳过本任务。 */
++    fun isCheckFailed(): Boolean = manifest == null
++
++    override fun checkState(): InstallableItem.State {
++        val manifest = manifest ?: return InstallableItem.State.NOT_EXISTS
++        return when {
++            manifest.markerMatches(markerFile) -> InstallableItem.State.FINISHED
++            markerFile.exists() -> InstallableItem.State.PENDING // 换新包时自动重装
++            else -> InstallableItem.State.NOT_STARTED
++        }
++    }
++
++    override suspend fun run() {
++        val manifest = manifest ?: return
++        updateMessage("Preparing bundled modpack...")
++        val targetDir = File(GamePathManager.getCurrentPath()).apply { mkdirs() }
++        checkFreeSpace(targetDir, manifest.sizeBytes)
++
++        // 先把 pack.zip 原样复制到缓存并校验原始字节 sha256（与工具端 ComputeSha256 口径一致），
++        // 校验通过前不写任何游戏文件，损坏的包不会留下半成品。
++        val staged = stageAndVerify(manifest)
++        when {
++            manifest.isSnapshot -> {
++                extractSnapshot(staged, targetDir)
++                runCatching { staged.delete() }
++                markerFile.parentFile?.mkdirs()
++                markerFile.writeText(manifest.markerContent)
++                VersionsManager.refresh(TAG)
++                Logger.info(TAG, "Bundled snapshot installed: ${manifest.markerContent}")
++            }
++            else -> {
++                pendingImportFile = staged // 不写标记：导入成功后由 MainActivity 侧写入
++                Logger.info(TAG, "Bundled packzip staged for import: ${staged.absolutePath}")
++            }
++        }
++    }
++
++    private fun checkFreeSpace(dir: File, packBytes: Long) {
++        val free = StatFs(dir.absolutePath).availableBytes
++        val required = packBytes * 3 / 2
++        if (free < required) {
++            throw IllegalStateException("Not enough free space for bundled modpack: need $required bytes, have $free")
++        }
++    }
++
++    /** 把 assets 中的 pack.zip 复制到缓存文件，并校验其原始字节的 SHA-256。 */
++    private fun stageAndVerify(manifest: BundledModpackManifest): File {
++        val dir = File(PathManager.DIR_CACHE_MODPACK_DOWNLOADER, "bundled").apply { mkdirs() }
++        val target = File(dir, "${manifest.packId}.zip")
++        val digest = MessageDigest.getInstance("SHA-256")
++        var totalBytes = 0L
++        context.assets.open(BUNDLED_PACK_ZIP_ASSET).use { input ->
++            target.outputStream().use { out ->
++                val buffer = ByteArray(1 shl 16)
++                while (true) {
++                    val read = input.read(buffer)
++                    if (read < 0) break
++                    out.write(buffer, 0, read)
++                    digest.update(buffer, 0, read)
++                    totalBytes += read
++                    if (totalBytes % (64L shl 20) == 0L) {
++                        updateMessage("Verifying bundled modpack... ${totalBytes shr 20} MB")
++                    }
++                }
++            }
++        }
++        val actual = digest.digest().joinToString("") { "%02x".format(it) }
++        if (actual != manifest.sha256) {
++            runCatching { target.delete() }
++            throw IllegalStateException(
++                "Bundled pack checksum mismatch: expected ${manifest.sha256}, got $actual"
++            )
++        }
++        return target
++    }
++
++    /** 从已校验的缓存 zip 解包到游戏目录（覆盖合并、幂等；逐条目路径穿越防护）。 */
++    private fun extractSnapshot(zipFile: File, targetDir: File) {
++        ZipInputStream(FileInputStream(zipFile)).use { zip ->
++            while (true) {
++                val entry = zip.nextEntry ?: break
++                val safeName = BundledPackPathSafety.sanitize(entry.name) ?: run {
++                    Logger.warning(TAG, "Rejecting unsafe zip entry: ${entry.name}")
++                    continue
++                }
++                if (safeName == BUNDLED_PACK_MARKER_FILE) {
++                    Logger.warning(TAG, "Rejecting marker overwrite entry: ${entry.name}")
++                    continue
++                }
++                val target = File(targetDir, safeName)
++                if (entry.isDirectory) {
++                    target.mkdirs()
++                    continue
++                }
++                target.parentFile?.mkdirs()
++                target.outputStream().use { out ->
++                    val buffer = ByteArray(1 shl 16)
++                    var entryBytes = 0L
++                    while (true) {
++                        val read = zip.read(buffer)
++                        if (read < 0) break
++                        out.write(buffer, 0, read)
++                        entryBytes += read
++                        if (entryBytes % (64L shl 20) == 0L) {
++                            updateMessage("Extracting ${safeName}... ${entryBytes shr 20} MB")
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
++
++/** zip 条目路径安全校验（纯函数，便于单测）。 */
++object BundledPackPathSafety {
++    /** 通过返回规范化条目名；拒绝绝对路径、'..'、反斜杠、盘符与空段。 */
++    fun sanitize(name: String): String? {
++        if (name.isEmpty()) return null
++        if (name.startsWith("/") || name.startsWith("\\")) return null
++        if (name.contains("\\")) return null
++        val parts = name.split('/')
++        for ((index, part) in parts.withIndex()) {
++            val isLast = index == parts.lastIndex
++            if (part == "..") return null
++            if (part.isEmpty() && !isLast) return null
++            if (part.contains(":")) return null
++        }
++        return name
++    }
++}
+diff --git a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/game/download/modpack/install/BundledModpackManifest.kt b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/game/download/modpack/install/BundledModpackManifest.kt
+new file mode 100644
+index 00000000..3dc865ac
+--- /dev/null
++++ b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/game/download/modpack/install/BundledModpackManifest.kt
+@@ -0,0 +1,80 @@
++/*
++ * Zalith Launcher 2
++ * Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
++ * (GPL-3.0，见仓库 LICENSE)
++ */
++package com.movtery.zalithlauncher.game.download.modpack.install
++
++import android.content.Context
++import com.movtery.zalithlauncher.utils.GSON
++import com.movtery.zalithlauncher.utils.logging.Logger
++import java.io.File
++
++private const val TAG = "BundledModpackManifest"
++
++/** 内嵌整合包资产目录（跨端契约，schema=1） */
++const val BUNDLED_PACK_ASSET_DIR = "bundled_pack"
++const val BUNDLED_PACK_MANIFEST_ASSET = "$BUNDLED_PACK_ASSET_DIR/manifest.json"
++const val BUNDLED_PACK_ZIP_ASSET = "$BUNDLED_PACK_ASSET_DIR/pack.zip"
++const val BUNDLED_PACK_MARKER_FILE = ".bundled_pack_version"
++
++data class BundledModpackManifest(
++    val schema: Int = 0,
++    val packId: String? = null,
++    val packVersion: Long = -1L,
++    val type: String? = null,
++    val name: String? = null,
++    val mcVersion: String? = null,
++    val sizeBytes: Long = -1L,
++    val sha256: String? = null,
++) {
++    companion object {
++        const val SCHEMA = 1
++        const val TYPE_SNAPSHOT = "snapshot"
++        const val TYPE_PACKZIP = "packzip"
++
++        /** 从 assets 读取并校验；不存在或非法返回 null（调用方视为无内嵌包）。 */
++        fun load(context: Context): BundledModpackManifest? {
++            val json = runCatching {
++                context.assets.open(BUNDLED_PACK_MANIFEST_ASSET).use { it.readBytes().decodeToString() }
++            }.getOrElse {
++                Logger.debug(TAG, "No bundled modpack manifest in this APK", it)
++                return null
++            }
++            val manifest = runCatching {
++                GSON.fromJson(json, BundledModpackManifest::class.java)
++            }.getOrElse {
++                Logger.error(TAG, "Failed to parse bundled modpack manifest", it)
++                return null
++            }
++            if (!manifest.validate()) {
++                Logger.error(TAG, "Bundled modpack manifest validation failed: $manifest")
++                return null
++            }
++            Logger.info(
++                TAG,
++                "Bundled modpack manifest loaded: packId=${manifest.packId}, type=${manifest.type}, size=${manifest.sizeBytes}"
++            )
++            return manifest
++        }
++    }
++
++    /** 与 Windows 端 PackBundler 的 Validate() 规则一致。 */
++    fun validate(): Boolean {
++        if (schema != SCHEMA) return false
++        if (packId.isNullOrBlank()) return false
++        if (packVersion < 0) return false
++        if (type != TYPE_SNAPSHOT && type != TYPE_PACKZIP) return false
++        if (sizeBytes <= 0) return false
++        val sha = sha256 ?: return false
++        if (!sha.matches(Regex("^[0-9a-f]{64}$"))) return false
++        if (type == TYPE_SNAPSHOT && mcVersion.isNullOrBlank()) return false
++        return true
++    }
++
++    val isSnapshot: Boolean get() = type == TYPE_SNAPSHOT
++    val markerContent: String get() = "$packId:$packVersion"
++
++    fun markerMatches(file: File): Boolean =
++        file.exists() && runCatching { file.readText() }.getOrNull() == markerContent
++}
+diff --git a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/MainActivity.kt b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/MainActivity.kt
+index c6a8ce5f..d93bb539 100644
+--- a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/MainActivity.kt
++++ b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/MainActivity.kt
+@@ -830,6 +830,12 @@ class MainActivity : BaseAppCompatActivity() {
+             modpackImportViewModel.import(
+                 context = this@MainActivity,
+                 uri = uri,
++                bundledName = intent.getStringExtra(EXTRA_IMPORT_PACK_NAME)?.takeIf {
++                    intent.getBooleanExtra(EXTRA_IMPORT_BUNDLED, false)
++                },
++                bundledMarker = intent.getStringExtra(EXTRA_IMPORT_BUNDLED_MARKER)?.takeIf {
++                    intent.getBooleanExtra(EXTRA_IMPORT_BUNDLED, false)
++                },
+                 onStart = {
+                     lifecycleScope.launch {
+                         keepScreen(true)
+diff --git a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/SplashActivity.kt b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/SplashActivity.kt
+index f63abe04..41e531fb 100644
+--- a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/SplashActivity.kt
++++ b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/ui/activities/SplashActivity.kt
+@@ -37,6 +37,7 @@ import com.movtery.zalithlauncher.components.InstallableItem
+ import com.movtery.zalithlauncher.components.UnpackComponentsTask
+ import com.movtery.zalithlauncher.components.jre.Jre
+ import com.movtery.zalithlauncher.components.jre.UnpackJnaTask
++import com.movtery.zalithlauncher.components.BundledModpackTask
+ import com.movtery.zalithlauncher.components.jre.UnpackJreTask
+ import com.movtery.zalithlauncher.setting.AllSettings
+ import com.movtery.zalithlauncher.ui.base.BaseAppCompatActivity
+@@ -62,6 +63,10 @@ const val IMPORT_TYPE_MODPACK = "modpack"
+ const val IMPORT_TYPE_CONTROLS = "controls"
+ const val IMPORT_TYPE_UNKNOWN = "unknown"
+ 
++const val EXTRA_IMPORT_BUNDLED = "EXTRA_IMPORT_BUNDLED"
++const val EXTRA_IMPORT_PACK_NAME = "EXTRA_IMPORT_PACK_NAME"
++const val EXTRA_IMPORT_BUNDLED_MARKER = "EXTRA_IMPORT_BUNDLED_MARKER"
++
+ @SuppressLint("CustomSplashScreen")
+ @AndroidEntryPoint
+ class SplashActivity : BaseAppCompatActivity() {
+@@ -69,6 +74,7 @@ class SplashActivity : BaseAppCompatActivity() {
+     private val finishedTaskCount = AtomicInteger(0)
+ 
+     private var pendingImportIntent: Intent? = null
++    private var bundledModpackTask: BundledModpackTask? = null
+ 
+     private val backStackViewModel: SplashBackStackViewModel by viewModels()
+ 
+@@ -154,6 +160,17 @@ class SplashActivity : BaseAppCompatActivity() {
+                 )
+             )
+         }
++        val bundledTask = BundledModpackTask(this@SplashActivity)
++        if (!bundledTask.isCheckFailed()) {
++            bundledModpackTask = bundledTask
++            unpackItems.add(
++                InstallableItem(
++                    getString(R.string.unpack_screen_bundled_pack),
++                    getString(R.string.unpack_screen_bundled_pack_summary),
++                    bundledTask
++                )
++            )
++        }
+         unpackItems.sort()
+     }
+ 
+@@ -233,9 +250,27 @@ class SplashActivity : BaseAppCompatActivity() {
+ 
+         if (import != null && handleImportIntent(import)) {
+             finish()
+-        } else {
+-            swapToMain()
++            return
+         }
++
++        val bundledImport = bundledModpackTask?.pendingImportFile
++        val bundledManifest = bundledModpackTask?.manifest
++        if (bundledImport != null && bundledManifest != null) {
++            val forward = Intent(this, MainActivity::class.java).apply {
++                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
++                putExtra(EXTRA_IMPORT_ACTION, Intent.ACTION_VIEW)
++                putExtra(EXTRA_IMPORT_URI, Uri.fromFile(bundledImport))
++                putExtra(EXTRA_IMPORT_TYPE, IMPORT_TYPE_MODPACK)
++                putExtra(EXTRA_IMPORT_BUNDLED, true)
++                putExtra(EXTRA_IMPORT_PACK_NAME, bundledManifest.name)
++                putExtra(EXTRA_IMPORT_BUNDLED_MARKER, bundledManifest.markerContent)
++            }
++            startActivity(forward)
++            finish()
++            return
++        }
++
++        swapToMain()
+     }
+ 
+     private fun checkTasksToMain(): Boolean {
+diff --git a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/viewmodel/ModpackImportViewModel.kt b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/viewmodel/ModpackImportViewModel.kt
+index 642cdf75..2dfa7e21 100644
+--- a/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/viewmodel/ModpackImportViewModel.kt
++++ b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/viewmodel/ModpackImportViewModel.kt
+@@ -41,10 +41,12 @@ import androidx.lifecycle.viewModelScope
+ import com.google.gson.JsonSyntaxException
+ import com.movtery.zalithlauncher.R
+ import com.movtery.zalithlauncher.game.download.jvm_server.JvmCrashException
++import com.movtery.zalithlauncher.game.download.modpack.install.BUNDLED_PACK_MARKER_FILE
+ import com.movtery.zalithlauncher.game.download.modpack.install.ModpackImporter
+ import com.movtery.zalithlauncher.game.download.modpack.install.PackNotSupportedException
+ import com.movtery.zalithlauncher.game.download.modpack.install.UnsupportedPackReason
+ import com.movtery.zalithlauncher.game.download.modpack.platform.PackPlatform
++import com.movtery.zalithlauncher.game.path.GamePathManager
+ import com.movtery.zalithlauncher.game.version.download.DownloadFailedException
+ import com.movtery.zalithlauncher.game.version.installed.VersionsManager
+ import com.movtery.zalithlauncher.ui.components.MarqueeText
+@@ -58,6 +60,7 @@ import com.movtery.zalithlauncher.utils.logging.Logger
+ import io.ktor.client.plugins.HttpRequestTimeoutException
+ import kotlinx.coroutines.suspendCancellableCoroutine
+ import kotlinx.serialization.SerializationException
++import java.io.File
+ import java.net.ConnectException
+ import java.net.SocketTimeoutException
+ import java.net.UnknownHostException
+@@ -152,6 +155,8 @@ class ModpackImportViewModel : ViewModel() {
+     fun import(
+         context: Context,
+         uri: Uri,
++        bundledName: String? = null,
++        bundledMarker: String? = null,
+         onStart: () -> Unit = {},
+         onStop: () -> Unit = {}
+     ) {
+@@ -164,11 +169,21 @@ class ModpackImportViewModel : ViewModel() {
+             context = context,
+             uri = uri,
+             scope = viewModelScope,
+-            waitForVersionName = ::waitForVersionName,
++            waitForVersionName = if (bundledName != null) { { bundledName } } else ::waitForVersionName,
+             waitForConfirmMobileData = ::waitForConfirmMobileData
+         ).also {
+             it.startImport(
+                 onFinished = { version ->
++                    if (bundledMarker != null) {
++                        runCatching {
++                            File(GamePathManager.getCurrentPath(), BUNDLED_PACK_MARKER_FILE).apply {
++                                parentFile?.mkdirs()
++                                writeText(bundledMarker)
++                            }
++                        }.onFailure { e ->
++                            Logger.error(TAG, "Failed to write bundled pack marker", e)
++                        }
++                    }
+                     importer = null
+                     VersionsManager.refresh("[Modpack] ModpackImporter.onFinished", version)
+                     importOperation = ModpackImportOperation.Finished
+diff --git a/ZalithLauncher/src/main/res/values-zh-rCN/strings.xml b/ZalithLauncher/src/main/res/values-zh-rCN/strings.xml
+index 29b727cb..ec88ca62 100644
+--- a/ZalithLauncher/src/main/res/values-zh-rCN/strings.xml
++++ b/ZalithLauncher/src/main/res/values-zh-rCN/strings.xml
+@@ -169,6 +169,8 @@
+     <string name="unpack_screen_lwjgl">轻量级 Java 游戏库，Minecraft 依赖它运行游戏</string>
+     <string name="unpack_screen_launcher">启动器依赖的一些组件</string>
+     <string name="unpack_screen_jna">让 Minecraft 能直接调用操作系统的底层功能</string>
++    <string name="unpack_screen_bundled_pack">内嵌整合包</string>
++    <string name="unpack_screen_bundled_pack_summary">安装此 APK 内嵌的整合包</string>
+     <!--  主菜单  -->
+     <string name="main_launch_game">启动游戏</string>
+     <string name="main_task_menu">任务菜单</string>
+diff --git a/ZalithLauncher/src/main/res/values-zh-rTW/strings.xml b/ZalithLauncher/src/main/res/values-zh-rTW/strings.xml
+index 1da8cd0c..7ae7d9af 100644
+--- a/ZalithLauncher/src/main/res/values-zh-rTW/strings.xml
++++ b/ZalithLauncher/src/main/res/values-zh-rTW/strings.xml
+@@ -154,6 +154,8 @@
+     <string name="unpack_screen_lwjgl">輕量級 Java 遊戲函式庫，Minecraft 依賴它執行遊戲</string>
+     <string name="unpack_screen_launcher">啟動器依賴的一些元件</string>
+     <string name="unpack_screen_jna">讓 Minecraft 能直接呼叫作業系統的底層功能</string>
++    <string name="unpack_screen_bundled_pack">內嵌整合包</string>
++    <string name="unpack_screen_bundled_pack_summary">安裝此 APK 內嵌的整合包</string>
+     <!--  主選單  -->
+     <string name="main_launch_game">啟動遊戲</string>
+     <string name="main_task_menu">任務選單</string>
+diff --git a/ZalithLauncher/src/main/res/values/strings.xml b/ZalithLauncher/src/main/res/values/strings.xml
+index ace26904..a338770b 100644
+--- a/ZalithLauncher/src/main/res/values/strings.xml
++++ b/ZalithLauncher/src/main/res/values/strings.xml
+@@ -168,6 +168,8 @@
+     <string name="unpack_screen_lwjgl">Lightweight Java Game Library (required by Minecraft)</string>
+     <string name="unpack_screen_launcher">Essential launcher components</string>
+     <string name="unpack_screen_jna">Enables Minecraft to directly call low-level OS functions</string>
++    <string name="unpack_screen_bundled_pack">Bundled modpack</string>
++    <string name="unpack_screen_bundled_pack_summary">Imports the modpack embedded in this APK</string>
+     <!-- Main Menu -->
+     <string name="main_launch_game">Launch</string>
+     <string name="main_task_menu">Task Menu</string>
+diff --git a/ZalithLauncher/src/test/java/com/movtery/zalithlauncher/components/BundledPackPathSafetyTest.kt b/ZalithLauncher/src/test/java/com/movtery/zalithlauncher/components/BundledPackPathSafetyTest.kt
+new file mode 100644
+index 00000000..ed1f875e
+--- /dev/null
++++ b/ZalithLauncher/src/test/java/com/movtery/zalithlauncher/components/BundledPackPathSafetyTest.kt
+@@ -0,0 +1,36 @@
++package com.movtery.zalithlauncher.components
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Test
++
++class BundledPackPathSafetyTest {
++
++    @Test
++    fun normalPathsPass() {
++        assertEquals("versions/1.20.1/1.20.1.jar", BundledPackPathSafety.sanitize("versions/1.20.1/1.20.1.jar"))
++        assertEquals("mods/a.mod.jar", BundledPackPathSafety.sanitize("mods/a.mod.jar"))
++        assertEquals("dir/", BundledPackPathSafety.sanitize("dir/"))
++    }
++
++    @Test
++    fun parentTraversalRejected() {
++        assertNull(BundledPackPathSafety.sanitize("../evil.txt"))
++        assertNull(BundledPackPathSafety.sanitize("a/../../b.txt"))
++        assertNull(BundledPackPathSafety.sanitize(".."))
++    }
++
++    @Test
++    fun absoluteAndBackslashRejected() {
++        assertNull(BundledPackPathSafety.sanitize("/etc/passwd"))
++        assertNull(BundledPackPathSafety.sanitize("\\windows\\system32\\x"))
++        assertNull(BundledPackPathSafety.sanitize("a\\b.txt"))
++    }
++
++    @Test
++    fun emptySegmentsAndDriveRejected() {
++        assertNull(BundledPackPathSafety.sanitize("a//b.txt"))
++        assertNull(BundledPackPathSafety.sanitize(""))
++        assertNull(BundledPackPathSafety.sanitize("C:/windows/x"))
++    }
++}
+diff --git a/ZalithLauncher/src/test/java/com/movtery/zalithlauncher/game/download/modpack/install/BundledModpackManifestTest.kt b/ZalithLauncher/src/test/java/com/movtery/zalithlauncher/game/download/modpack/install/BundledModpackManifestTest.kt
+new file mode 100644
+index 00000000..ac2aafa2
+--- /dev/null
++++ b/ZalithLauncher/src/test/java/com/movtery/zalithlauncher/game/download/modpack/install/BundledModpackManifestTest.kt
+@@ -0,0 +1,74 @@
++package com.movtery.zalithlauncher.game.download.modpack.install
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class BundledModpackManifestTest {
++
++    private fun valid() = BundledModpackManifest(
++        schema = 1,
++        packId = "test-pack",
++        packVersion = 1,
++        type = "snapshot",
++        name = "Test",
++        mcVersion = "1.20.1",
++        sizeBytes = 1024,
++        sha256 = "a".repeat(64)
++    )
++
++    @Test
++    fun validManifestPasses() {
++        assertTrue(valid().validate())
++    }
++
++    @Test
++    fun wrongSchemaFails() {
++        assertFalse(valid().copy(schema = 2).validate())
++    }
++
++    @Test
++    fun missingPackIdFails() {
++        assertFalse(valid().copy(packId = " ").validate())
++    }
++
++    @Test
++    fun snapshotRequiresMcVersion() {
++        assertFalse(valid().copy(mcVersion = null).validate())
++    }
++
++    @Test
++    fun packZipWithoutMcVersionPasses() {
++        assertTrue(valid().copy(type = "packzip", mcVersion = null).validate())
++    }
++
++    @Test
++    fun badShaFails() {
++        assertFalse(valid().copy(sha256 = "zzz").validate())
++    }
++
++    @Test
++    fun markerContentIsPackIdColonVersion() {
++        assertEquals("test-pack:1", valid().markerContent)
++    }
++
++    @Test
++    fun gsonParsesCamelCaseJson() {
++        val json = """
++            {
++              "schema": 1,
++              "packId": "p1",
++              "packVersion": 3,
++              "type": "snapshot",
++              "name": "n",
++              "mcVersion": "1.20.1",
++              "sizeBytes": 42,
++              "sha256": "${"a".repeat(64)}"
++            }
++        """.trimIndent()
++        val parsed = com.movtery.zalithlauncher.utils.GSON.fromJson(json, BundledModpackManifest::class.java)
++        assertTrue(parsed.validate())
++        assertEquals(3L, parsed.packVersion)
++    }
++}
