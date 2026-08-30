@@ -44,10 +44,11 @@ public static class PackPipeline
         try
         {
             var packZip = Path.Combine(tempDir, "pack.zip");
+            var fixedJsons = 0;
             if (analysis.Type == BundledPackType.Snapshot)
             {
                 progress?.Invoke("打包游戏目录…");
-                SnapshotPacker.Create(options.PackInput, packZip, progress);
+                fixedJsons = SnapshotPacker.Create(options.PackInput, packZip, progress);
             }
             else
             {
@@ -108,6 +109,9 @@ public static class PackPipeline
             ApkRebuilder.Rebuild(baseForEmbedding, rebuilt, manifest.ToJson(), packZip, extraDex, extraAssets, manifestOverride, progress);
 
             var warnings = Guards.Check(packBytes, new FileInfo(rebuilt).Length);
+            if (fixedJsons > 0)
+                warnings.Add(new GuardWarning("info",
+                    $"已自动修复 {fixedJsons} 个版本 json 中重复的 libraries 条目（PCL2 等导出的整合包常见，重复库会导致启动游戏时报 Duplicate key）。"));
 
             progress?.Invoke("zipalign + apksigner 签名…");
             ApkSigner.Run(sdk.BuildToolsDir, rebuilt, options.OutputApk, options.Signing, progress);
