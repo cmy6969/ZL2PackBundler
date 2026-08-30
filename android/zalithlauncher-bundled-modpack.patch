@@ -314,14 +314,15 @@ index 0f2649fe1e9289dcf2f75c3cb0f6b6d2f733fdd8..00000000000000000000000000000000
  import com.movtery.zalithlauncher.game.plugin.ApkPlugin
  import com.movtery.zalithlauncher.game.plugin.PluginLoader
  import com.movtery.zalithlauncher.game.plugin.appCacheIcon
-@@ -230,7 +230,28 @@
+@@ -230,7 +230,29 @@
                  }
              }
  
 +            //整合包内嵌工具信息（ZL2PackBundler 写入 assets/zl2packbundler/tool-info.json）
-+            val bundledToolInfo = remember { BundledToolInfo.load(LocalContext.current) }
-+            bundledToolInfo?.let { info ->
-+                animatedItem(scope) { yOffset ->
++            animatedItem(scope) { yOffset ->
++                val context = LocalContext.current
++                val bundledToolInfo = remember { BundledToolInfo.load(context) }
++                bundledToolInfo?.let { info ->
 +                    ChunkLayout(
 +                        modifier = Modifier.offset { IntOffset(x = 0, y = yOffset.roundToPx()) },
 +                        title = stringResource(R.string.about_bundled_tool_title)
