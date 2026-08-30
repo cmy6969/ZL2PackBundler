@@ -20,7 +20,7 @@ public static class KeyStoreGenerator
             rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         using var cert = request.CreateSelfSigned(
             DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(30));
-        cert.FriendlyName = aliasName; // 作为 PKCS12 条目别名
+        if (OperatingSystem.IsWindows()) cert.FriendlyName = aliasName; // 作为 PKCS12 条目别名
         File.WriteAllBytes(outputPath, cert.Export(X509ContentType.Pfx, pass));
         return outputPath;
     }

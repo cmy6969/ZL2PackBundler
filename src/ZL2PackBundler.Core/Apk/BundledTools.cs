@@ -36,11 +36,21 @@ public static class BundledTools
                 "此版本未内置便携运行时。请安装 JDK 17+ 与 Android SDK build-tools，或使用 Releases 里的便携版。");
         log?.Invoke("首次运行解包便携运行时（JRE/apktool/签名工具）…");
         Directory.CreateDirectory(RuntimeDir);
-        using var zip = new ZipArchive(s, ZipArchiveMode.Read);
+        ExtractZip(s, RuntimeDir);
+        if (!File.Exists(java))
+            throw new InvalidOperationException("便携运行时解包不完整（缺 JRE）。");
+        return RuntimeDir;
+    }
+
+    /// <summary>解包 zip（兼容 Compress-Archive 的反斜杠条目名与尾部分隔符）。</summary>
+    public static void ExtractZip(Stream stream, string destDir)
+    {
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
         foreach (var entry in zip.Entries)
         {
-            var dest = Path.Combine(RuntimeDir, entry.FullName.Replace('/', Path.DirectorySeparatorChar));
-            if (entry.FullName.EndsWith('/'))
+            var name = entry.FullName.Replace('\\', '/');
+            var dest = Path.Combine(destDir, name.Replace('/', Path.DirectorySeparatorChar));
+            if (name.EndsWith('/'))
             {
                 Directory.CreateDirectory(dest);
                 continue;
@@ -50,9 +60,6 @@ public static class BundledTools
             using var fs = File.Create(dest);
             es.CopyTo(fs);
         }
-        if (!File.Exists(java))
-            throw new InvalidOperationException("便携运行时解包不完整（缺 JRE）。");
-        return RuntimeDir;
     }
 
     /// <summary>java：JAVA_HOME 优先，其次便携 JRE，最后 PATH 上的 java。</summary>
