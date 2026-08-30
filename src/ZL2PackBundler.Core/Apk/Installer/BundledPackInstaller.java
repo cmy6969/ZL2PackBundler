@@ -48,6 +48,7 @@ public class BundledPackInstaller extends Activity {
     private Manifest manifest;
     private String launcherActivity = "";
     private String importAlias = "";
+    private String manifestError = "";
 
     private static final class Manifest {
         int schema;
@@ -85,7 +86,7 @@ public class BundledPackInstaller extends Activity {
                         + ", packId=" + manifest.packId + ", sha256=" + manifest.sha256
                         + ", sizeBytes=" + manifest.sizeBytes + ")";
             } else if (!launcherActivity.isEmpty()) {
-                reason = "整合包 manifest 缺失或无法解析";
+                reason = "整合包 manifest 缺失或无法解析（" + manifestError + "）";
             }
             showConfigError(reason);
             return;
@@ -345,7 +346,10 @@ public class BundledPackInstaller extends Activity {
     private Manifest readManifest() {
         try {
             String json = readAsset(MANIFEST_ASSET);
-            if (json == null) return null;
+            if (json == null) {
+                manifestError = "assets 打开失败（文件不存在或不可读）";
+                return null;
+            }
             Manifest m = new Manifest();
             m.schema = parseIntSafe(readString(json, "schema"), 0);
             m.packId = readString(json, "packId");
@@ -356,6 +360,7 @@ public class BundledPackInstaller extends Activity {
             m.sizeBytes = parseLongSafe(readString(json, "sizeBytes"), -1);
             return m;
         } catch (Throwable t) {
+            manifestError = "解析异常：" + t;
             return null;
         }
     }
