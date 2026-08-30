@@ -70,9 +70,33 @@ public static class PackPipeline
             if (errors.Count > 0)
                 throw new InvalidOperationException("manifest 校验失败：" + string.Join("; ", errors));
 
+            // 基础 APK 处理：官方原版 → 注入安装器；已打补丁 → 直接使用
+            if (OfficialApkDetector.MaxDexIndex(options.BaseApk) == 0)
+                throw new InvalidDataException("基础 APK 中没有 classes.dex，不是有效的 ZL2 APK。");
+
+            string baseForEmbedding;
+            BaseApkKind baseApkKind;
+            List<(string EntryName, string FilePath)>? extraDex = null;
+            if (OfficialApkDetector.IsPatchedBuild(options.BaseApk))
+            {
+                baseForEmbedding = options.BaseApk;
+                baseApkKind = BaseApkKind.PatchedBuild;
+                progress?.Invoke("基础 APK 已含内嵌支持代码，直接嵌入…");
+            }
+            else
+            {
+                progress?.Invoke("基础 APK 为官方原版，开始注入安装器…");
+                var injection = OfficialApkInjector.Inject(
+                    options.BaseApk, tempDir, sdk.BuildToolsDir, progress);
+                baseForEmbedding = injection.BaseApkPath;
+                baseApkKind = BaseApkKind.OfficialInjected;
+                if (injection.DexEntryName != null && injection.DexFilePath != null)
+                    extraDex = new List<(string, string)> { (injection.DexEntryName, injection.DexFilePath) };
+            }
+
             var rebuilt = Path.Combine(tempDir, "rebuilt.apk");
             progress?.Invoke("重建 APK（嵌入内嵌资产）…");
-            ApkRebuilder.Rebuild(options.BaseApk, rebuilt, manifest.ToJson(), packZip, progress);
+            ApkRebuilder.Rebuild(baseForEmbedding, rebuilt, manifest.ToJson(), packZip, extraDex, progress);
 
             var warnings = Guards.Check(packBytes, new FileInfo(rebuilt).Length);
 
@@ -81,7 +105,7 @@ public static class PackPipeline
             var cert = ApkSigner.Verify(sdk.BuildToolsDir, options.OutputApk, progress);
 
             return new PackReport(
-                analysis.Type, analysis.Format, name, analysis.McVersion,
+                analysis.Type, analysis.Format, baseApkKind, name, analysis.McVersion,
                 packBytes, new FileInfo(options.OutputApk).Length, options.OutputApk,
                 analysis.OfflineReport, warnings, cert);
         }

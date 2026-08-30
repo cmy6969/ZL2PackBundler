@@ -17,8 +17,11 @@ public static class ApkRebuilder
          || string.Equals(e.FullName, BundledPackManifest.PackZipAssetPath, StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>复制基础 APK 全部条目（剔除旧签名文件与旧内嵌资产），追加 manifest 与 pack.zip。</summary>
+    /// <summary>
+    /// 复制基础 APK 全部条目（剔除旧签名文件与旧内嵌资产），追加注入 dex（可选）、manifest 与 pack.zip。
+    /// </summary>
     public static void Rebuild(string baseApk, string outputApk, string manifestJson, string packZipPath,
+        IReadOnlyList<(string EntryName, string FilePath)>? extraDexEntries = null,
         Action<string>? progress = null)
     {
         using var source = ZipFile.OpenRead(baseApk);
@@ -47,6 +50,18 @@ public static class ApkRebuilder
             src.CopyTo(dst);
             done++;
             if (done % 500 == 0) progress?.Invoke($"复制 APK 条目 {done}/{total}");
+        }
+
+        if (extraDexEntries != null)
+        {
+            foreach (var (entryName, filePath) in extraDexEntries)
+            {
+                progress?.Invoke("注入安装器 dex：" + entryName);
+                var dexEntry = dest.CreateEntry(entryName, CompressionLevel.NoCompression);
+                using (var fs = File.OpenRead(filePath))
+                using (var dst = dexEntry.Open())
+                    fs.CopyTo(dst);
+            }
         }
 
         progress?.Invoke("写入 assets/bundled_pack/manifest.json");

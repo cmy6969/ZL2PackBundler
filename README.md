@@ -12,14 +12,18 @@
             ▼  ZL2PackBundler（.NET 8，GUI / CLI 共用内核）
    识别格式 → 生成 manifest.json + pack.zip
             │
+            ▼  基础 APK 处理（自动）
+   ├─ 官方原版 APK → 注入内置安装器（manifest 修补 + 注入 dex）
+   └─ 已打补丁构建 → 直接使用
+            │
             ▼  重建 APK zip（剔除旧签名）
    追加 assets/bundled_pack/{manifest.json, pack.zip}
             │
             ▼  zipalign → apksigner（v2+v3 重签名）
          最终 APK
             │ 安装到设备
-            ▼  ZL2（已打补丁）SplashActivity
-   首次启动自动安装内嵌整合包（快照解包 / 导入管线）
+            ▼  首次启动：安装器（官方 APK）或 SplashActivity（打补丁构建）
+   自动安装内嵌整合包（快照解包 / 导入管线）
             │
             ▼  主界面直接出现该 MC 版本，零下载
 ```
@@ -41,26 +45,24 @@ docs/                         设计规格 / 实施计划 / ADR
 
 - Windows 10/11，.NET 8 SDK
 - Android SDK build-tools（需要 `zipalign` 与 `apksigner`；安装 Android Studio 或命令行工具时勾选）
-- JDK 17（`keytool`，用于自动生成测试 keystore）
-- 出 APK 还需要 JDK 17 + Android SDK + Gradle（构建 ZL2）
+- JDK 17（`keytool`/`javac`，用于签名与注入安装器编译）
+- 官方原版 APK 注入模式首次运行需联网下载 apktool（约 22MB，缓存于 `%APPDATA%\ZL2PackBundler\tools`）
+- 自行构建带补丁的 ZL2 另需 Android SDK + Gradle（可选，见下）
 
 ## 构建与测试
 
 ```bash
 dotnet build ZL2PackBundler.sln -c Release
-dotnet test ZL2PackBundler.sln -c Release      # 25 个单元测试
+dotnet test ZL2PackBundler.sln -c Release      # 29 个单元测试
 bash scripts/integration-test.sh               # 端到端：嵌入→签名→校验（Git Bash）
 ```
 
 ## 完整出包流程
 
-1. **构建带补丁的 ZL2**：把 [android/](android/) 中的改动应用到 ZalithLauncher2 源码（复制文件 或 `git apply`，详见 [android/README.md](android/README.md)），然后：
+1. **准备基础 APK（二选一）**：
 
-   ```bash
-   cd ZalithLauncher2
-   ./gradlew :ZalithLauncher:assembleDebug        # 或 assembleRelease（用你的签名）
-   # 产物：ZalithLauncher/build/outputs/apk/debug/*.apk
-   ```
+   - **官方原版 APK（推荐，零代码工作）**：从 [ZalithLauncher2 Releases](https://github.com/ZalithLauncher/ZalithLauncher2/releases) 下载官方 APK。工具检测到官方原版后会自动注入一个内置安装器（修改清单入口 + 注入 dex），首次启动先由安装器装好整合包再进入原版启动器。
+   - **自行构建带补丁的 ZL2**：把 [android/](android/) 中的改动应用到 ZalithLauncher2 源码（复制文件 或 `git apply`，详见 [android/README.md](android/README.md)），然后 `./gradlew :ZalithLauncher:assembleDebug`（或 `assembleRelease`）。
 
 2. **准备整合包**：
    - 完整离线：一个完整的 `.minecraft` 目录，含 `versions/`、`libraries/`、`assets/`（模组/配置/材质/存档随意放）；
@@ -74,9 +76,9 @@ bash scripts/integration-test.sh               # 端到端：嵌入→签名→�
      --auto-keystore        # 测试用；正式分发请用 --keystore/--ks-pass/--key-alias
    ```
 
-   GUI 方式：`dotnet run --project src/ZL2PackBundler.App`，按向导四步完成。
+   GUI 方式：`dotnet run --project src/ZL2PackBundler.App`，按向导四步完成（选择 APK 后会自动显示“官方原版/已打补丁”检测结果）。
 
-4. 安装输出 APK，首次启动即自动安装整合包（splash 进度条），完成直接可玩。
+4. 安装输出 APK，首次启动即自动安装整合包（进度条），完成直接可玩。
 
 ## 命令行
 
@@ -103,8 +105,8 @@ Android SDK 自动探测（环境变量 → 上次记住的目录 → 常见路�
 
 ## 真机验收清单
 
-1. 安装输出 APK → 首次启动 splash 出现「Bundled modpack / 内嵌整合包」进度
-2. 日志出现 `BundledModpackManifest/INFO Bundled modpack manifest loaded` 与 `Bundled snapshot installed`
+1. 安装输出 APK → 首次启动出现「正在安装内嵌整合包」进度界面（官方原版路径）或 splash 的「Bundled modpack」进度项（打补丁构建路径）
+2. 打补丁构建路径：日志出现 `BundledModpackManifest/INFO Bundled modpack manifest loaded` 与 `Bundled snapshot installed`
 3. 主界面版本列表出现该 MC 版本
 4. 飞行模式下用离线账号启动游戏，能进标题/世界（完全离线）
 5. 再次冷启动不重复解包
@@ -119,7 +121,8 @@ Android SDK 自动探测（环境变量 → 上次记住的目录 → 常见路�
 ## 常见问题
 
 - **报“未找到 Android SDK build-tools”**：`--sdk <SDK目录>` 指定一次（GUI 里选择一次）即被记住；或设置 `ANDROID_HOME`。
-- **装机后无进度条/无版本**：确认基础 APK 是用打过补丁的源码构建的（原版 APK 不认识内嵌资产）；日志中应有 `Bundled modpack manifest loaded`。
+- **官方原版 APK 首次打包很慢**：需要联网下载 apktool（仅首次，约 22MB）并对 APK 做一次解码/重建（视 APK 大小需数分钟），后续复用缓存；也支持直接选用打补丁构建的 APK 跳过注入。
+- **装机后无进度条/无版本**：官方原版路径看是否出现「正在安装内嵌整合包」界面；打补丁构建路径确认日志中有 `Bundled modpack manifest loaded`（旧版工具产出的大小写 `type` 已修复，请用最新版重新打包）。
 - **包体过大**：参考体积护栏；正式渠道分发请评估 Play 等渠道的包体积限制。
 
 ## 参考文档

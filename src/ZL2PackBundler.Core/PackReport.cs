@@ -3,9 +3,12 @@ using ZL2PackBundler.Core.Models;
 
 namespace ZL2PackBundler.Core;
 
+public enum BaseApkKind { PatchedBuild, OfficialInjected }
+
 public sealed record PackReport(
     BundledPackType Type,
     PackFormat Format,
+    BaseApkKind BaseApkKind,
     string Name,
     string? McVersion,
     long PackZipBytes,

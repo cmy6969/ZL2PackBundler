@@ -10,12 +10,12 @@ printf '{"id":"1.20.1"}' > "$TMP/mc/versions/1.20.1/1.20.1.json"
 echo "fake-jar" > "$TMP/mc/versions/1.20.1/1.20.1.jar"
 echo "options" > "$TMP/mc/options.txt"
 
-# 伪造基础 APK（带旧签名文件与 dex）
+# 伪造基础 APK（dex 含内嵌契约常量 → 模拟“已打补丁构建”，走直接嵌入路径）
 python - <<'PY'
 import zipfile, os
 os.makedirs('.tmp/itest', exist_ok=True)
 with zipfile.ZipFile('.tmp/itest/base.apk', 'w') as z:
-    z.writestr('classes.dex', b'dex')
+    z.writestr('classes.dex', b'dex-bundled_pack/manifest.json-marker')
     z.writestr('META-INF/MANIFEST.MF', b'Manifest-Version: 1.0')
     z.writestr('META-INF/CERT.RSA', b'fake-signature')
     z.writestr('AndroidManifest.xml', b'<manifest/>')

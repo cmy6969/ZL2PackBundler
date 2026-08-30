@@ -42,7 +42,23 @@ public partial class MainWindow : Window
     private void OnBrowseApk(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog { Filter = "APK 文件 (*.apk)|*.apk" };
-        if (dlg.ShowDialog(this) == true) vm.ApkPath = dlg.FileName;
+        if (dlg.ShowDialog(this) != true) return;
+        vm.ApkPath = dlg.FileName;
+        vm.BaseApkStatus = "正在检测 APK 类型…";
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var patched = Core.Apk.OfficialApkDetector.IsPatchedBuild(vm.ApkPath);
+                vm.BaseApkStatus = patched
+                    ? "检测结果：已含内嵌支持代码的构建 → 直接嵌入。"
+                    : "检测结果：官方原版 APK → 将自动注入内置安装器（首次运行需联网下载 apktool）。";
+            }
+            catch (Exception ex)
+            {
+                vm.BaseApkStatus = "检测失败：" + ex.Message;
+            }
+        });
     }
 
     private void OnBrowsePackFolder(object sender, RoutedEventArgs e)

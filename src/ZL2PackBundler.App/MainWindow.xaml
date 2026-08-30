@@ -15,11 +15,12 @@
         <Grid Grid.Row="1">
             <!-- 页1：选择基础 APK 与整合包 -->
             <StackPanel x:Name="Page1">
-                <TextBlock Text="基础 APK（ZL2 或其改名分支的构建产物）" FontWeight="SemiBold"/>
-                <DockPanel Margin="0,4,0,16">
+                <TextBlock Text="基础 APK（官方原版或已打补丁的构建均可；官方原版将自动注入安装器）" FontWeight="SemiBold"/>
+                <DockPanel Margin="0,4,0,4">
                     <Button DockPanel.Dock="Right" Content="浏览…" Width="80" Click="OnBrowseApk"/>
                     <TextBox Text="{Binding ApkPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
                 </DockPanel>
+                <TextBlock Text="{Binding BaseApkStatus}" Foreground="#2563EB" TextWrapping="Wrap" Margin="0,0,0,16"/>
                 <TextBlock Text="整合包（.minecraft 文件夹 或 整合包 zip）" FontWeight="SemiBold"/>
                 <DockPanel Margin="0,4,0,16">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">

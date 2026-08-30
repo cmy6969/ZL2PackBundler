@@ -19,6 +19,9 @@ public sealed class MainViewModel : ObservableObject
     private string apkPath = "";
     public string ApkPath { get => apkPath; set => Set(ref apkPath, value); }
 
+    private string baseApkStatus = "";
+    public string BaseApkStatus { get => baseApkStatus; set => Set(ref baseApkStatus, value); }
+
     private string packPath = "";
     public string PackPath { get => packPath; set => Set(ref packPath, value); }
 

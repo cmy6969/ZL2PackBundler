@@ -88,6 +88,7 @@ static void Pack(Dictionary<string, string?> o)
     var report = PackPipeline.Run(options, msg => Console.WriteLine("  " + msg));
     Console.WriteLine();
     Console.WriteLine("=== 打包完成 ===");
+    Console.WriteLine($"基础 APK: {(report.BaseApkKind == BaseApkKind.OfficialInjected ? "官方原版（已自动注入安装器）" : "已含内嵌支持代码（直接嵌入）")}");
     Console.WriteLine($"类型: {report.Type} / 格式: {report.Format}");
     Console.WriteLine($"名称: {report.Name} / MC: {report.McVersion ?? "-"}");
     Console.WriteLine($"pack.zip: {report.PackZipBytes / (1024.0 * 1024.0):F1} MB");
