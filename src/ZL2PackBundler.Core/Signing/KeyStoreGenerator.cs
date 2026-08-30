@@ -1,7 +1,9 @@
-using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 
 namespace ZL2PackBundler.Core.Signing;
 
+/// <summary>纯 C# 生成 PKCS12 keystore（自签名 RSA-2048，30 年有效），不再依赖 keytool。</summary>
 public static class KeyStoreGenerator
 {
     public static string Create(string outputPath, string? alias = null, string? password = null, Action<string>? log = null)
@@ -10,40 +12,16 @@ public static class KeyStoreGenerator
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath))!);
         var aliasName = alias ?? "zl2packbundler";
         var pass = password ?? ApkSigner.AutoKeyStorePassword;
-        var psi = new ProcessStartInfo(LocateKeytool())
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var a in new[]
-        {
-            "-genkeypair", "-keystore", outputPath, "-alias", aliasName,
-            "-keyalg", "RSA", "-keysize", "2048", "-validity", "10950",
-            "-storepass", pass,
-            "-keypass", pass,
-            "-dname", "CN=ZL2PackBundler, OU=PackBundler, O=ZL2PackBundler, L=Unknown, ST=Unknown, C=CN"
-        }) psi.ArgumentList.Add(a);
 
-        using var p = Process.Start(psi)!;
-        var stdout = p.StandardOutput.ReadToEnd();
-        var stderr = p.StandardError.ReadToEnd();
-        p.WaitForExit();
-        log?.Invoke(stdout + stderr);
-        if (p.ExitCode != 0)
-            throw new InvalidOperationException($"keytool 失败：{stderr}");
+        log?.Invoke("生成 PKCS12 keystore（RSA-2048，30 年有效）…");
+        using var rsa = RSA.Create(2048);
+        var request = new CertificateRequest(
+            "CN=ZL2PackBundler, OU=PackBundler, O=ZL2PackBundler, C=CN",
+            rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using var cert = request.CreateSelfSigned(
+            DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(30));
+        cert.FriendlyName = aliasName; // 作为 PKCS12 条目别名
+        File.WriteAllBytes(outputPath, cert.Export(X509ContentType.Pfx, pass));
         return outputPath;
-    }
-
-    private static string LocateKeytool()
-    {
-        var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
-        if (!string.IsNullOrEmpty(javaHome))
-        {
-            var p = Path.Combine(javaHome, "bin", "keytool.exe");
-            if (File.Exists(p)) return p;
-        }
-        return "keytool";
     }
 }

@@ -22,6 +22,7 @@ public static class ApkRebuilder
     /// </summary>
     public static void Rebuild(string baseApk, string outputApk, string manifestJson, string packZipPath,
         IReadOnlyList<(string EntryName, string FilePath)>? extraDexEntries = null,
+        IReadOnlyList<(string EntryName, byte[] Content)>? extraAssetEntries = null,
         Action<string>? progress = null)
     {
         using var source = ZipFile.OpenRead(baseApk);
@@ -61,6 +62,17 @@ public static class ApkRebuilder
                 using (var fs = File.OpenRead(filePath))
                 using (var dst = dexEntry.Open())
                     fs.CopyTo(dst);
+            }
+        }
+
+        if (extraAssetEntries != null)
+        {
+            foreach (var (entryName, content) in extraAssetEntries)
+            {
+                progress?.Invoke("写入注入配置：" + entryName);
+                var assetEntry = dest.CreateEntry(entryName, CompressionLevel.Optimal);
+                using var dst = assetEntry.Open();
+                dst.Write(content);
             }
         }
 

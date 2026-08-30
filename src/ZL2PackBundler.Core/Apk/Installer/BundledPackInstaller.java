@@ -27,11 +27,11 @@ import java.util.zip.ZipInputStream;
 /**
  * ZL2PackBundler 注入安装器（官方原版 APK 的入口替代）。
  * 仅使用 Android 框架 API：首次启动安装 APK 内嵌整合包，然后把入口转交给原版启动器。
- * 常量 @LAUNCHER@ / @IMPORT_ALIAS@ / @APP_LABEL@ 由打包工具在注入时替换。
+ * 组件名从 assets/zl2packbundler/installer-config.json 读取（由打包工具注入时写入），
+ * 因此本类可预编译成静态 dex，无需在用户机器上编译。
  */
 public class BundledPackInstaller extends Activity {
-    private static final String LAUNCHER_ACTIVITY = "@LAUNCHER@";
-    private static final String IMPORT_ALIAS = "@IMPORT_ALIAS@";
+    private static final String CONFIG_ASSET = "zl2packbundler/installer-config.json";
     private static final String MANIFEST_ASSET = "bundled_pack/manifest.json";
     private static final String PACK_ASSET = "bundled_pack/pack.zip";
     private static final String MARKER_FILE = ".bundled_pack_version";
@@ -46,6 +46,8 @@ public class BundledPackInstaller extends Activity {
 
     private File gameDir;
     private Manifest manifest;
+    private String launcherActivity = "";
+    private String importAlias = "";
 
     private static final class Manifest {
         int schema;
@@ -73,9 +75,11 @@ public class BundledPackInstaller extends Activity {
         File external = getExternalFilesDir(null);
         gameDir = new File(external != null ? external : getFilesDir(), ".minecraft");
 
+        readConfig();
         manifest = readManifest();
-        if (manifest == null || !manifest.valid()) {
-            forwardToLauncher();
+
+        if (launcherActivity.isEmpty() || manifest == null || !manifest.valid()) {
+            showConfigError();
             return;
         }
 
@@ -87,6 +91,21 @@ public class BundledPackInstaller extends Activity {
 
         buildUi();
         startInstall();
+    }
+
+    private void showConfigError() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER);
+        TextView title = new TextView(this);
+        title.setTextSize(18f);
+        title.setText("内嵌整合包配置缺失或损坏");
+        root.addView(title);
+        TextView hint = new TextView(this);
+        hint.setTextSize(13f);
+        hint.setText("请使用最新版 ZL2PackBundler 重新打包此 APK。");
+        root.addView(hint);
+        setContentView(root);
     }
 
     private void buildUi() {
@@ -212,10 +231,8 @@ public class BundledPackInstaller extends Activity {
             target.getParentFile().mkdirs();
             FileOutputStream out = new FileOutputStream(target);
             int read;
-            long entryBytes = 0;
             while ((read = zip.read(buffer)) >= 0) {
                 out.write(buffer, 0, read);
-                entryBytes += read;
                 done += read;
                 if (done % (32L << 20) == 0) {
                     final long mb = done >> 20;
@@ -245,13 +262,13 @@ public class BundledPackInstaller extends Activity {
                         return;
                     }
                     writeText(flag, String.valueOf(versions));
-                    if (IMPORT_ALIAS.length() == 0 || IMPORT_ALIAS.charAt(0) == '@') {
+                    if (importAlias.isEmpty()) {
                         forwardToLauncher(); // 该 APK 没有整合包导入入口，只能让用户手动导入
                         return;
                     }
                     Intent intent = new Intent(Intent.ACTION_VIEW);
                     intent.setDataAndType(Uri.fromFile(staged), "application/zip");
-                    intent.setComponent(new ComponentName(getPackageName(), IMPORT_ALIAS));
+                    intent.setComponent(new ComponentName(getPackageName(), importAlias));
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     startActivity(intent);
                     finish();
@@ -287,7 +304,7 @@ public class BundledPackInstaller extends Activity {
     private void forwardToLauncher() {
         Intent intent = new Intent(Intent.ACTION_MAIN);
         intent.addCategory(Intent.CATEGORY_LAUNCHER);
-        intent.setComponent(new ComponentName(getPackageName(), LAUNCHER_ACTIVITY));
+        intent.setComponent(new ComponentName(getPackageName(), launcherActivity));
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
         finish();
@@ -299,17 +316,22 @@ public class BundledPackInstaller extends Activity {
         });
     }
 
+    private void readConfig() {
+        try {
+            String json = readAsset(CONFIG_ASSET);
+            if (json == null) return;
+            launcherActivity = readString(json, "launcher");
+            importAlias = readString(json, "importAlias");
+            if (launcherActivity == null) launcherActivity = "";
+            if (importAlias == null) importAlias = "";
+        } catch (Throwable ignored) {
+        }
+    }
+
     private Manifest readManifest() {
         try {
-            InputStream in = getAssets().open(MANIFEST_ASSET);
-            StringBuilder sb = new StringBuilder();
-            byte[] buffer = new byte[1 << 13];
-            int read;
-            while ((read = in.read(buffer)) >= 0) {
-                sb.append(new String(buffer, 0, read, "UTF-8"));
-            }
-            in.close();
-            String json = sb.toString();
+            String json = readAsset(MANIFEST_ASSET);
+            if (json == null) return null;
             Manifest m = new Manifest();
             m.schema = parseIntSafe(readString(json, "schema"), 0);
             m.packId = readString(json, "packId");
@@ -319,6 +341,22 @@ public class BundledPackInstaller extends Activity {
             m.sha256 = readString(json, "sha256");
             m.sizeBytes = parseLongSafe(readString(json, "sizeBytes"), -1);
             return m;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private String readAsset(String path) {
+        try {
+            InputStream in = getAssets().open(path);
+            StringBuilder sb = new StringBuilder();
+            byte[] buffer = new byte[1 << 13];
+            int read;
+            while ((read = in.read(buffer)) >= 0) {
+                sb.append(new String(buffer, 0, read, "UTF-8"));
+            }
+            in.close();
+            return sb.toString();
         } catch (Throwable t) {
             return null;
         }

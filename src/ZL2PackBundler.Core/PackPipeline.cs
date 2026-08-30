@@ -77,6 +77,7 @@ public static class PackPipeline
             string baseForEmbedding;
             BaseApkKind baseApkKind;
             List<(string EntryName, string FilePath)>? extraDex = null;
+            List<(string EntryName, byte[] Content)>? extraAssets = null;
             if (OfficialApkDetector.IsPatchedBuild(options.BaseApk))
             {
                 baseForEmbedding = options.BaseApk;
@@ -92,11 +93,17 @@ public static class PackPipeline
                 baseApkKind = BaseApkKind.OfficialInjected;
                 if (injection.DexEntryName != null && injection.DexFilePath != null)
                     extraDex = new List<(string, string)> { (injection.DexEntryName, injection.DexFilePath) };
+                if (injection.InstallerConfigJson != null)
+                    extraAssets = new List<(string, byte[])>
+                    {
+                        (BundledTools.InstallerConfigZipEntry,
+                         System.Text.Encoding.UTF8.GetBytes(injection.InstallerConfigJson))
+                    };
             }
 
             var rebuilt = Path.Combine(tempDir, "rebuilt.apk");
             progress?.Invoke("重建 APK（嵌入内嵌资产）…");
-            ApkRebuilder.Rebuild(baseForEmbedding, rebuilt, manifest.ToJson(), packZip, extraDex, progress);
+            ApkRebuilder.Rebuild(baseForEmbedding, rebuilt, manifest.ToJson(), packZip, extraDex, extraAssets, progress);
 
             var warnings = Guards.Check(packBytes, new FileInfo(rebuilt).Length);
 

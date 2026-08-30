@@ -18,6 +18,10 @@ public static class ApktoolRunner
 
     public static string EnsureApktool(Action<string>? log = null)
     {
+        // 便携运行时内置的 apktool 优先
+        var bundledJar = BundledTools.TryLocateBundledApktool(log);
+        if (bundledJar != null) return bundledJar;
+
         Directory.CreateDirectory(ToolsDir);
         if (File.Exists(ApktoolJarPath) && new FileInfo(ApktoolJarPath).Length > 10_000_000)
             return ApktoolJarPath;

@@ -21,14 +21,22 @@ public class AndroidSdkTests
     }
 
     [Fact]
-    public void LocateThrowsWithGuidanceWhenNotFound()
+    public void LocateFallsBackToBundledOrThrows()
     {
         var bogus = Path.Combine(Path.GetTempPath(), "zl2pb-none-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(bogus);
 
         Assert.Null(AndroidSdk.TryLocate(bogus)); // 显式目录不存在时不允许回退到其它根
-        var ex = Assert.Throws<InvalidOperationException>(() => AndroidSdk.Locate(bogus));
-        Assert.Contains("--sdk", ex.Message);
+        if (Apk.BundledTools.HasEmbeddedRuntime())
+        {
+            var sdk = AndroidSdk.Locate(bogus); // 便携运行时兜底
+            Assert.True(sdk.IsBundled);
+        }
+        else
+        {
+            var ex = Assert.Throws<InvalidOperationException>(() => AndroidSdk.Locate(bogus));
+            Assert.Contains("--sdk", ex.Message);
+        }
     }
 
     [Fact]

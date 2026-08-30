@@ -7,6 +7,8 @@ public sealed class InjectionResult
     /// <summary>追加的安装器 dex 条目名；未注入时为 null。</summary>
     public string? DexEntryName { get; init; }
     public string? DexFilePath { get; init; }
+    /// <summary>写入 assets/zl2packbundler/installer-config.json 的内容；未注入时为 null。</summary>
+    public string? InstallerConfigJson { get; init; }
     public required ManifestInfo ManifestInfo { get; init; }
 }
 
@@ -51,13 +53,15 @@ public static class OfficialApkInjector
         ApktoolRunner.Build(decodedDir, patchedApk, sdkBuildToolsDir, log);
 
         var next = OfficialApkDetector.NextDexEntryName(OfficialApkDetector.MaxDexIndex(patchedApk));
-        var dex = AndroidBuildTools.CompileInstaller(sdkBuildToolsDir, workDir, info.LauncherName, info.ImportAlias ?? "", log);
+        var dex = BundledTools.ExtractInstallerDex(workDir, log);
+        var config = BundledTools.BuildInstallerConfigJson(info.LauncherName, info.ImportAlias ?? "");
 
         return new InjectionResult
         {
             BaseApkPath = patchedApk,
             DexEntryName = next,
             DexFilePath = dex,
+            InstallerConfigJson = config,
             ManifestInfo = info
         };
     }

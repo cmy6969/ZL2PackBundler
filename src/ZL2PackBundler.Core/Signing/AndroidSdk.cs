@@ -5,6 +5,8 @@ public sealed class AndroidSdk
     public required string BuildToolsDir { get; init; }
     /// <summary>SDK 根目录（探测到/指定时填充）。</summary>
     public string? SdkRoot { get; init; }
+    /// <summary>是否来自便携运行时（内置工具）。</summary>
+    public bool IsBundled { get; init; }
     public string Zipalign => Path.Combine(BuildToolsDir, "zipalign.exe");
     public string ApkSignerJar => Path.Combine(BuildToolsDir, "lib", "apksigner.jar");
 
@@ -30,6 +32,10 @@ public sealed class AndroidSdk
     {
         var sdk = TryLocate(explicitDir);
         if (sdk != null) return sdk;
+
+        // 便携运行时兜底（无需安装 Android SDK）
+        var bundled = Apk.BundledTools.TryLocateBundledBuildTools();
+        if (bundled != null) return new AndroidSdk { BuildToolsDir = bundled, IsBundled = true };
 
         var searched = BuildCandidates(explicitDir)
             .Where(d => !string.IsNullOrWhiteSpace(d))

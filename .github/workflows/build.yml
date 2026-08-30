@@ -1,0 +1,68 @@
+name: build
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-37 build-tools;36.1.0'
+
+      - name: Download apktool
+        run: |
+          curl.exe -L --fail --retry 3 -o apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.9.3/apktool_2.9.3.jar
+
+      - name: Build portable runtime (JRE + apktool + signing tools)
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/build-bundled-runtime.ps1 `
+            -ApktoolJar apktool.jar `
+            -BuildTools "$env:ANDROID_HOME\build-tools\36.1.0" `
+            -JdkHome "$env:JAVA_HOME"
+
+      - name: Test
+        run: dotnet test ZL2PackBundler.sln -c Release
+
+      - name: Publish GUI (single-file)
+        run: dotnet publish src/ZL2PackBundler.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish/win-x64
+
+      - name: Publish CLI (single-file)
+        run: dotnet publish src/ZL2PackBundler.Cli -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish/win-x64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZL2PackBundler-win-x64
+          path: |
+            publish/win-x64/ZL2PackBundler.App.exe
+            publish/win-x64/zl2packbundler.exe
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            publish/win-x64/ZL2PackBundler.App.exe
+            publish/win-x64/zl2packbundler.exe
+          generate_release_notes: true

@@ -11,3 +11,10 @@
 # 本地密钥（切勿提交任何 keystore）
 *.keystore
 *.jks
+
+# 便携运行时（体积大，由 CI 或 scripts/build-bundled-runtime.ps1 生成）
+src/ZL2PackBundler.Core/Bundled/runtime.zip
+
+# 单文件发布产物
+publish/
+dist/

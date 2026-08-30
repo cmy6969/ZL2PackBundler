@@ -8,6 +8,9 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Apk\Installer\BundledPackInstaller.java" />
+    <EmbeddedResource Include="Apk\Installer\BundledPackInstaller.dex" />
+    <!-- 便携运行时：由 scripts/build-bundled-runtime.ps1 生成；不存在时回退系统 JDK/SDK -->
+    <EmbeddedResource Include="Bundled\runtime.zip" Condition="Exists('Bundled\runtime.zip')" />
   </ItemGroup>
 
 </Project>

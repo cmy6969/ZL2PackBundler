@@ -43,19 +43,39 @@ docs/                         设计规格 / 实施计划 / ADR
 
 ## 环境要求
 
+**便携版（Releases 的 exe）**：仅需 Windows 10/11 x64，其它全部内置。
+
+**源码构建/开发**：
 - Windows 10/11，.NET 8 SDK
-- Android SDK build-tools（需要 `zipalign` 与 `apksigner`；安装 Android Studio 或命令行工具时勾选）
-- JDK 17（`keytool`/`javac`，用于签名与注入安装器编译）
-- 官方原版 APK 注入模式首次运行需联网下载 apktool（约 22MB，缓存于 `%APPDATA%\ZL2PackBundler\tools`）
+- JDK 17 与 Android SDK build-tools（未内嵌便携运行时 `runtime.zip` 时使用；`zipalign`/`aapt2`/`apksigner` 需要 build-tools，apktool 首次联网下载缓存于 `%APPDATA%\ZL2PackBundler\tools`）
 - 自行构建带补丁的 ZL2 另需 Android SDK + Gradle（可选，见下）
 
-## 构建与测试
+## 下载使用（Releases 便携版）
+
+从 [Releases](../../releases) 下载单个 exe 双击即用，**无需安装 .NET/JDK/Android SDK**（内置精简 JRE、apktool、zipalign/aapt2/apksigner，首次运行自动解包）：
+
+- `ZL2PackBundler.App.exe` — 图形界面（四步向导）
+- `zl2packbundler.exe` — 命令行
+
+仅要求 Windows 10/11 x64。
+
+## 构建与测试（开发者）
 
 ```bash
 dotnet build ZL2PackBundler.sln -c Release
 dotnet test ZL2PackBundler.sln -c Release      # 29 个单元测试
 bash scripts/integration-test.sh               # 端到端：嵌入→签名→校验（Git Bash）
+
+# 便携运行时内嵌（否则开发构建回退使用本机 JDK/Android SDK）
+powershell -ExecutionPolicy Bypass -File scripts/build-bundled-runtime.ps1 `
+  -ApktoolJar <apktool.jar> -BuildTools <sdk/build-tools/36.1.0> -JdkHome <jdk17>
+
+# 单文件发布
+dotnet publish src/ZL2PackBundler.App -c Release -r win-x64 --self-contained true `
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64
 ```
+
+推送 `v*` 标签（如 `v1.0.0`）后，GitHub Actions 会自动构建测试并把两个 exe 附加到 Release。
 
 ## 完整出包流程
 
