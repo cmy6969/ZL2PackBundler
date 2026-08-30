@@ -20,24 +20,5 @@ public static class AndroidBuildTools
     }
 
     private static string RunCaptured(string fileName, IEnumerable<string> args, Action<string>? log)
-    {
-        var psi = new ProcessStartInfo(fileName)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var a in args) psi.ArgumentList.Add(a);
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException("无法启动 " + fileName);
-        var stdout = p.StandardOutput.ReadToEnd();
-        var stderr = p.StandardError.ReadToEnd();
-        p.WaitForExit();
-        if (stdout.Length > 0) log?.Invoke(stdout.TrimEnd());
-        if (stderr.Length > 0) log?.Invoke(stderr.TrimEnd());
-        if (p.ExitCode != 0)
-            throw new InvalidOperationException(
-                Path.GetFileName(fileName) + " 退出码 " + p.ExitCode + "：\n" + stdout + "\n" + stderr);
-        return stdout + stderr;
-    }
+        => ProcessRunner.Run(fileName, args, log, TimeSpan.FromMinutes(5));
 }

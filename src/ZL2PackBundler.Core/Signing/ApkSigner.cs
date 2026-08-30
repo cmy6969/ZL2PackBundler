@@ -80,24 +80,5 @@ public static class ApkSigner
         => RunToolCaptured(fileName, args, log);
 
     private static string RunToolCaptured(string fileName, IEnumerable<string> args, Action<string>? log)
-    {
-        var psi = new ProcessStartInfo(fileName)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var a in args) psi.ArgumentList.Add(a);
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException($"无法启动 {fileName}");
-        var stdout = p.StandardOutput.ReadToEnd();
-        var stderr = p.StandardError.ReadToEnd();
-        p.WaitForExit();
-        log?.Invoke(stdout);
-        if (!string.IsNullOrWhiteSpace(stderr)) log?.Invoke(stderr);
-        if (p.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"{Path.GetFileName(fileName)} 退出码 {p.ExitCode}：\n{stdout}\n{stderr}");
-        return stdout + stderr;
-    }
+        => ProcessRunner.Run(fileName, args, log, TimeSpan.FromMinutes(10));
 }

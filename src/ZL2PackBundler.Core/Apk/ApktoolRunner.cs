@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace ZL2PackBundler.Core.Apk;
 
 /// <summary>apktool 的下载缓存与 decode/build 封装（仅用于官方原版 APK 的清单注入）。</summary>
@@ -51,21 +49,11 @@ public static class ApktoolRunner
 
         // 兜底：用系统 curl.exe（对部分网络环境更稳）
         log?.Invoke("改用 curl.exe 下载…");
-        var psi = new ProcessStartInfo("curl.exe")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var a in new[] { "-L", "--fail", "--retry", "3", "-o", ApktoolJarPath, ApktoolUrl })
-            psi.ArgumentList.Add(a);
-        using var p = Process.Start(psi)!;
-        p.StandardOutput.ReadToEnd();
-        p.StandardError.ReadToEnd();
-        p.WaitForExit();
+        ProcessRunner.Run("curl.exe",
+            new[] { "-L", "--fail", "--retry", "3", "-o", ApktoolJarPath, ApktoolUrl },
+            log, TimeSpan.FromMinutes(15));
 
-        if (p.ExitCode != 0 || !File.Exists(ApktoolJarPath) || new FileInfo(ApktoolJarPath).Length <= 10_000_000)
+        if (!File.Exists(ApktoolJarPath) || new FileInfo(ApktoolJarPath).Length <= 10_000_000)
             throw new InvalidOperationException(
                 "apktool 下载失败（" + (last?.Message ?? "curl 失败") + "）。" +
                 "可手动下载 apktool_" + ApktoolVersion + ".jar 放到：" + ApktoolJarPath);
@@ -89,27 +77,11 @@ public static class ApktoolRunner
     {
         var jar = EnsureApktool(log);
         var java = Signing.ApkSigner.LocateJava();
-        var psi = new ProcessStartInfo(java)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        psi.ArgumentList.Add("-jar");
-        psi.ArgumentList.Add(jar);
-        foreach (var a in args) psi.ArgumentList.Add(a);
-        // apktool 某些操作需要 aapt/aapt2：把 build-tools 目录放进 PATH
-        var path = psi.Environment["PATH"] ?? "";
-        psi.Environment["PATH"] = sdkBuildToolsDir + ";" + path;
-
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException("无法启动 apktool");
-        var stdout = p.StandardOutput.ReadToEnd();
-        var stderr = p.StandardError.ReadToEnd();
-        p.WaitForExit();
-        if (stdout.Length > 0) log?.Invoke(stdout.TrimEnd());
-        if (stderr.Length > 0) log?.Invoke(stderr.TrimEnd());
-        if (p.ExitCode != 0)
-            throw new InvalidOperationException("apktool 退出码 " + p.ExitCode + "：\n" + stdout + "\n" + stderr);
+        var allArgs = new List<string> { "-jar", jar };
+        allArgs.AddRange(args);
+        // apktool 某些操作需要 aapt/aapt2：把 build-tools 目录放进 PATH；大 APK 重建较慢，放宽超时
+        var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+        ProcessRunner.Run(java, allArgs, log, TimeSpan.FromMinutes(30),
+            new Dictionary<string, string> { ["PATH"] = sdkBuildToolsDir + ";" + path });
     }
 }
