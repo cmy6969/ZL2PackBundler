@@ -73,6 +73,8 @@
                 <TextBox Text="{Binding PackageName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,8"/>
                 <TextBlock Text="修改应用名称（可选）" FontWeight="SemiBold"/>
                 <TextBox Text="{Binding AppName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"/>
+                <TextBlock Text="作者信息（可选，写入 APK 的 manifest.json 与 AndroidManifest meta-data）" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                <TextBox Text="{Binding Author, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"/>
                 <Button Content="开始打包" Width="140" Margin="0,16,0,0" Click="OnStartPack"/>
             </StackPanel>
 
@@ -90,9 +92,13 @@
             </Grid>
         </Grid>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button x:Name="BackButton" Content="上一步" Width="90" Click="OnBack" Margin="0,0,8,0"/>
-            <Button x:Name="NextButton" Content="下一步" Width="90" Click="OnNext"/>
-        </StackPanel>
+        <DockPanel Grid.Row="2" LastChildFill="False">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="BackButton" Content="上一步" Width="90" Click="OnBack" Margin="0,0,8,0"/>
+                <Button x:Name="NextButton" Content="下一步" Width="90" Click="OnNext"/>
+            </StackPanel>
+            <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Foreground="#6B7280"
+                       Text="ZL2PackBundler · 作者：cmy6969 · https://github.com/cmy6969/ZL2PackBundler · GPL-3.0"/>
+        </DockPanel>
     </Grid>
 </Window>

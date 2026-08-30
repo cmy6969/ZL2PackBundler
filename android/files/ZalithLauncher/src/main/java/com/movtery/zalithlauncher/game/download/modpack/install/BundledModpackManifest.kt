@@ -24,6 +24,7 @@ data class BundledModpackManifest(
     val packVersion: Long = -1L,
     val type: String? = null,
     val name: String? = null,
+    val author: String? = null,
     val mcVersion: String? = null,
     val sizeBytes: Long = -1L,
     val sha256: String? = null,

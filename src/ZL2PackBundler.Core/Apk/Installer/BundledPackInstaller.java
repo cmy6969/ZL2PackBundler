@@ -56,6 +56,7 @@ public class BundledPackInstaller extends Activity {
         long packVersion;
         String type;
         String name;
+        String author;
         String sha256;
         long sizeBytes;
 
@@ -139,6 +140,14 @@ public class BundledPackInstaller extends Activity {
         name.setTextSize(14f);
         name.setText(manifest.name != null ? manifest.name : manifest.packId);
         root.addView(name);
+
+        if (manifest.author != null && !manifest.author.isEmpty()) {
+            TextView author = new TextView(this);
+            author.setTextSize(13f);
+            author.setTextColor(0xFF6B7280);
+            author.setText("作者：" + manifest.author);
+            root.addView(author);
+        }
 
         progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setMax(1000);
@@ -367,6 +376,7 @@ public class BundledPackInstaller extends Activity {
             m.packVersion = parseLongSafe(readString(json, "packVersion"), -1);
             m.type = readString(json, "type");
             m.name = readString(json, "name");
+            m.author = readString(json, "author");
             m.sha256 = readString(json, "sha256");
             m.sizeBytes = parseLongSafe(readString(json, "sizeBytes"), -1);
             return m;

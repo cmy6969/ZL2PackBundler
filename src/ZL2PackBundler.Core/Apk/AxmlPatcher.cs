@@ -33,6 +33,7 @@ public static class AxmlPatcher
     private const byte TypeIntBoolean = 0x12;  // 布尔属性（如 exported）
 
     public const string InstallerActivityName = "com.zl2packbundler.installer.BundledPackInstaller";
+    public const string AuthorMetaDataName = "zl2packbundler.author";
 
     /// <summary>清单是否已注入过安装器（当前 LAUNCHER 就是安装器）。</summary>
     public static bool HasInstallerActivity(byte[] manifestBytes, string packageHint)
@@ -96,6 +97,35 @@ public static class AxmlPatcher
         var application = FindApplication(doc, androidNs)
             ?? throw new InvalidDataException("二进制清单中未找到 <application>。");
         SetAttr(application, doc.Pool, androidNs, "label", newLabel);
+        return Serialize(doc);
+    }
+
+    /// <summary>
+    /// 把作者信息写入 &lt;application&gt; 的 meta-data（zl2packbundler.author，字符串值）。
+    /// 已存在同名 meta-data 时替换值，避免重复写入。
+    /// </summary>
+    public static byte[] ApplyAuthor(byte[] manifestBytes, string author)
+    {
+        var doc = Parse(manifestBytes);
+        var androidNs = (uint)(doc.Pool.GetIndex("http://schemas.android.com/apk/res/android")
+            ?? throw new InvalidDataException("AXML 中缺少 android 命名空间。"));
+        var application = FindApplication(doc, androidNs)
+            ?? throw new InvalidDataException("二进制清单中未找到 <application>。");
+
+        foreach (var child in application.Children)
+        {
+            if (IsElement(child, "meta-data", androidNs, doc.Pool)
+                && child.GetAttr(doc.Pool, androidNs, "name") == AuthorMetaDataName)
+            {
+                SetAttr(child, doc.Pool, androidNs, "value", author);
+                return Serialize(doc);
+            }
+        }
+
+        var meta = NewElement(doc, androidNs, "meta-data");
+        meta.Attrs.Add(Attr(doc.Pool, androidNs, "name", AuthorMetaDataName));
+        meta.Attrs.Add(Attr(doc.Pool, androidNs, "value", author));
+        application.Children.Add(meta);
         return Serialize(doc);
     }
 

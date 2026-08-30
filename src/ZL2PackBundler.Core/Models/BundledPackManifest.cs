@@ -34,6 +34,9 @@ public sealed class BundledPackManifest
     [JsonConverter(typeof(BundledPackTypeConverter))]
     public BundledPackType Type { get; set; }
     public string Name { get; set; } = "";
+    /// <summary>可选：作者信息（同时写入 AndroidManifest 的 meta-data zl2packbundler.author）。</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Author { get; set; }
     public string? McVersion { get; set; }
     public long SizeBytes { get; set; }
     public string Sha256 { get; set; } = "";

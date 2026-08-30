@@ -70,6 +70,21 @@ public class ManifestTests
     }
 
     [Fact]
+    public void AuthorOptionalAndRoundTrips()
+    {
+        // 未设置时不写入（旧版设备端解析器可忽略未知字段，但保持产物精简）
+        Assert.DoesNotContain("author", Valid().ToJson());
+
+        var m = Valid();
+        m.Author = "cmy6969";
+        Assert.Empty(m.Validate());
+        var json = m.ToJson();
+        Assert.Contains("\"author\": \"cmy6969\"", json);
+        var back = JsonSerializer.Deserialize<BundledPackManifest>(json, BundledPackManifest.JsonOptions)!;
+        Assert.Equal("cmy6969", back.Author);
+    }
+
+    [Fact]
     public void TypeSerializesAsLowercaseContractValue()
     {
         Assert.Contains("\"type\": \"snapshot\"", Valid().ToJson());

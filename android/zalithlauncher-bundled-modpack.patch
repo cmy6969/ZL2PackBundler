@@ -177,7 +177,7 @@ new file mode 100644
 index 00000000..3dc865ac
 --- /dev/null
 +++ b/ZalithLauncher/src/main/java/com/movtery/zalithlauncher/game/download/modpack/install/BundledModpackManifest.kt
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,81 @@
 +/*
 + * Zalith Launcher 2
 + * Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
@@ -204,6 +204,7 @@ index 00000000..3dc865ac
 +    val packVersion: Long = -1L,
 +    val type: String? = null,
 +    val name: String? = null,
++    val author: String? = null,
 +    val mcVersion: String? = null,
 +    val sizeBytes: Long = -1L,
 +    val sha256: String? = null,

@@ -139,6 +139,7 @@ public partial class MainWindow : Window
                 SdkDir = string.IsNullOrWhiteSpace(vm.SdkPath) ? null : vm.SdkPath,
                 PackageName = string.IsNullOrWhiteSpace(vm.PackageName) ? null : vm.PackageName.Trim(),
                 AppName = string.IsNullOrWhiteSpace(vm.AppName) ? null : vm.AppName.Trim(),
+                Author = string.IsNullOrWhiteSpace(vm.Author) ? null : vm.Author.Trim(),
                 Signing = new SigningOptions
                 {
                     AutoKeyStore = vm.UseAutoKeyStore,
@@ -154,6 +155,7 @@ public partial class MainWindow : Window
             vm.LogText =
                 $"=== 打包完成 ===\n类型: {report.Type} / 格式: {report.Format}\n" +
                 $"名称: {report.Name} / MC: {report.McVersion ?? "-"}\n" +
+                (report.Author != null ? $"作者: {report.Author}\n" : "") +
                 $"pack.zip: {report.PackZipBytes / (1024.0 * 1024.0):F1} MB\n" +
                 $"最终 APK: {report.FinalApkBytes / (1024.0 * 1024.0):F1} MB\n" +
                 string.Join("\n", report.Warnings.Select(w => $"[{w.Level}] {w.Message}")) + "\n" +

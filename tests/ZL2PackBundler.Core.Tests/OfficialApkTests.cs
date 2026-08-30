@@ -131,6 +131,34 @@ public class OfficialApkTests
     }
 
     [Fact]
+    public void ApplyAuthorWritesMetaDataAndReplacesOnRerun()
+    {
+        var bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "AndroidManifest.bin"));
+        var patched = AxmlPatcher.ApplyAuthor(bytes, "测试作者");
+        var doc = AxmlPatcher.Parse(patched);
+        var androidNs = (uint)doc.Pool.GetIndex("http://schemas.android.com/apk/res/android")!;
+
+        var app = FindApp(doc.Roots, doc.Pool)!;
+        var meta = app.Children.FirstOrDefault(c =>
+            c.Kind == 0x0102 && doc.Pool.Strings[(int)c.NameIdx] == "meta-data"
+            && GetAttrValue(c, doc.Pool, androidNs, "name") == "zl2packbundler.author");
+        Assert.NotNull(meta);
+        Assert.Equal("测试作者", GetAttrValue(meta!, doc.Pool, androidNs, "value"));
+        Assert.Equal(0, patched.Length % 4);
+
+        // 再次写入（例如重复打包）只更新值，不产生重复 meta-data
+        var again = AxmlPatcher.ApplyAuthor(patched, "新作者");
+        var doc2 = AxmlPatcher.Parse(again);
+        var app2 = FindApp(doc2.Roots, doc2.Pool)!;
+        var metas = app2.Children
+            .Where(c => c.Kind == 0x0102 && doc2.Pool.Strings[(int)c.NameIdx] == "meta-data"
+                && GetAttrValue(c, doc2.Pool, androidNs, "name") == "zl2packbundler.author")
+            .ToList();
+        Assert.Single(metas);
+        Assert.Equal("新作者", GetAttrValue(metas[0], doc2.Pool, androidNs, "value"));
+    }
+
+    [Fact]
     public void InstallerActivityUsesTypedLaunchModeAndExported()
     {
         var bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "AndroidManifest.bin"));

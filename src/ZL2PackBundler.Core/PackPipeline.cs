@@ -17,6 +17,8 @@ public sealed class PackOptions
     public string? PackageName { get; init; }
     /// <summary>可选：修改应用显示名称。</summary>
     public string? AppName { get; init; }
+    /// <summary>可选：作者信息（写入 manifest.json 的 author 字段 + AndroidManifest meta-data）。</summary>
+    public string? Author { get; init; }
     public SigningOptions Signing { get; init; } = new();
     public string? SdkDir { get; init; }
     public bool Force { get; init; }
@@ -67,6 +69,7 @@ public static class PackPipeline
                 PackVersion = 1,
                 Type = analysis.Type,
                 Name = name,
+                Author = options.Author,
                 McVersion = analysis.McVersion,
                 SizeBytes = packBytes,
                 Sha256 = ComputeSha256(packZip)
@@ -108,8 +111,8 @@ public static class PackPipeline
                     };
             }
 
-            // 可选：修改包名 / 应用显示名称（两条路径都生效）
-            if (options.PackageName != null || options.AppName != null)
+            // 可选：修改包名 / 应用显示名称 / 写入作者信息（两条路径都生效）
+            if (options.PackageName != null || options.AppName != null || options.Author != null)
             {
                 var pkgRegex = new System.Text.RegularExpressions.Regex(
                     "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$");
@@ -117,12 +120,11 @@ public static class PackPipeline
                     ?? ApkRebuilder.ReadEntry(options.BaseApk, "AndroidManifest.xml")
                     ?? throw new InvalidDataException("基础 APK 中缺少 AndroidManifest.xml。");
 
-                var originalPackage = AndroidBuildTools.GetPackageName(options.BaseApk, sdk.BuildToolsDir);
-
                 if (options.PackageName != null)
                 {
                     if (!pkgRegex.IsMatch(options.PackageName))
                         throw new InvalidOperationException($"非法包名：{options.PackageName}（示例：com.example.renamed）");
+                    var originalPackage = AndroidBuildTools.GetPackageName(options.BaseApk, sdk.BuildToolsDir);
                     progress?.Invoke($"修改包名：{originalPackage} → {options.PackageName}");
                     renameManifest = AxmlPatcher.ApplyPackageRename(renameManifest, originalPackage, options.PackageName);
                 }
@@ -130,6 +132,11 @@ public static class PackPipeline
                 {
                     progress?.Invoke($"修改应用名称：{options.AppName}");
                     renameManifest = AxmlPatcher.ApplyAppLabel(renameManifest, options.AppName);
+                }
+                if (options.Author != null)
+                {
+                    progress?.Invoke($"写入作者信息：{options.Author}");
+                    renameManifest = AxmlPatcher.ApplyAuthor(renameManifest, options.Author);
                 }
                 manifestOverride = renameManifest;
             }
@@ -147,13 +154,16 @@ public static class PackPipeline
                     "已修改应用包名。注意：文件分享/导入导出类功能（FileProvider authority）可能与代码内常量不一致，如遇相关功能异常属正常；正式分发建议改源码构建期重命名。"));
             if (options.AppName != null)
                 warnings.Add(new GuardWarning("info", "已修改应用显示名称。"));
+            if (options.Author != null)
+                warnings.Add(new GuardWarning("info",
+                    "已写入作者信息（manifest.json 的 author 字段 + AndroidManifest meta-data zl2packbundler.author）。"));
 
             progress?.Invoke("zipalign + apksigner 签名…");
             ApkSigner.Run(sdk.BuildToolsDir, rebuilt, options.OutputApk, options.Signing, progress);
             var cert = ApkSigner.Verify(sdk.BuildToolsDir, options.OutputApk, progress);
 
             return new PackReport(
-                analysis.Type, analysis.Format, baseApkKind, name, analysis.McVersion,
+                analysis.Type, analysis.Format, baseApkKind, name, options.Author, analysis.McVersion,
                 packBytes, new FileInfo(options.OutputApk).Length, options.OutputApk,
                 analysis.OfflineReport, warnings, cert);
         }

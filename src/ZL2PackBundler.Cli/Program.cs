@@ -82,6 +82,7 @@ static void Pack(Dictionary<string, string?> o)
         PackId = o.GetValueOrDefault("pack-id"),
         PackageName = o.GetValueOrDefault("package"),
         AppName = o.GetValueOrDefault("app-name"),
+        Author = o.GetValueOrDefault("author"),
         SdkDir = o.GetValueOrDefault("sdk"),
         Force = o.ContainsKey("force"),
         Signing = BuildSigning(o)
@@ -93,6 +94,7 @@ static void Pack(Dictionary<string, string?> o)
     Console.WriteLine($"基础 APK: {(report.BaseApkKind == BaseApkKind.OfficialInjected ? "官方原版（已自动注入安装器）" : "已含内嵌支持代码（直接嵌入）")}");
     Console.WriteLine($"类型: {report.Type} / 格式: {report.Format}");
     Console.WriteLine($"名称: {report.Name} / MC: {report.McVersion ?? "-"}");
+    if (report.Author != null) Console.WriteLine($"作者: {report.Author}");
     Console.WriteLine($"pack.zip: {report.PackZipBytes / (1024.0 * 1024.0):F1} MB");
     Console.WriteLine($"最终 APK: {report.FinalApkBytes / (1024.0 * 1024.0):F1} MB");
     foreach (var w in report.Warnings)
@@ -145,16 +147,21 @@ ZL2PackBundler — 把整合包嵌入 ZL2 APK 的 Windows 工具
 
   zl2packbundler pack --apk <基础.apk> --pack <文件夹|zip> --out <输出.apk>
       [--name <名称>] [--pack-id <id>] [--package <新包名>] [--app-name <新应用名>]
+      [--author <作者信息>]
       [--sdk <android-sdk目录>] [--force]
       [--keystore <path> --ks-pass <密码> --key-alias <别名> --key-pass <密码>]
       [--auto-keystore]
       嵌入整合包 -> zipalign -> apksigner(v2+v3) 重签名。
       可选修改包名/应用名（如 --package com.example.renamed --app-name "我的启动器"）。
+      --author 会把作者信息写入 manifest.json 的 author 字段与 AndroidManifest 的
+      meta-data zl2packbundler.author（安装页也会显示）。
 
   zl2packbundler gen-keystore --out <ks.jks> [--alias <别名>] [--pass <密码>]
       生成一个测试用 keystore（正式分发请使用自有密钥）。
 
 示例:
-  zl2packbundler pack --apk zalith.apk --pack D:\mc\.minecraft --out out.apk --auto-keystore
+  zl2packbundler pack --apk zalith.apk --pack D:\mc\.minecraft --out out.apk --auto-keystore --author "cmy6969"
+
+作者: cmy6969 · https://github.com/cmy6969/ZL2PackBundler · GPL-3.0
 """);
 }

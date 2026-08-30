@@ -58,6 +58,9 @@ public sealed class MainViewModel : ObservableObject
     private string appName = "";
     public string AppName { get => appName; set => Set(ref appName, value); }
 
+    private string author = "";
+    public string Author { get => author; set => Set(ref author, value); }
+
     private string keyStorePath = "";
     public string KeyStorePath { get => keyStorePath; set => Set(ref keyStorePath, value); }
 

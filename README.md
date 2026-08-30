@@ -105,7 +105,7 @@ dotnet publish src/ZL2PackBundler.App -c Release -r win-x64 --self-contained tru
 ```
 zl2packbundler analyze --pack <文件夹|zip>     # 识别格式 + 离线完整性报告
 zl2packbundler pack --apk <a.apk> --pack <包> --out <o.apk>
-     [--name 名称] [--pack-id id] [--package 新包名] [--app-name 新应用名]
+     [--name 名称] [--pack-id id] [--package 新包名] [--app-name 新应用名] [--author 作者信息]
      [--sdk SDK目录] [--force]
      [--keystore ks --ks-pass pw --key-alias a --key-pass pw] [--auto-keystore]
 zl2packbundler gen-keystore --out ks.jks [--alias a] [--pass pw]
@@ -115,7 +115,8 @@ Android SDK 自动探测（环境变量 → 上次记住的目录 → 常见路�
 
 ## 跨端契约：`assets/bundled_pack/`
 
-- `manifest.json`（schema=1）：`packId`/`packVersion`/`type`(`snapshot`|`packzip`)/`name`/`mcVersion`/`sizeBytes`/`sha256`
+- `manifest.json`（schema=1）：`packId`/`packVersion`/`type`(`snapshot`|`packzip`)/`name`/`author`(可选)/`mcVersion`/`sizeBytes`/`sha256`
+- `--author` 会同时写入 `AndroidManifest.xml` 的 `meta-data zl2packbundler.author`，并显示在首次安装的进度界面（作者信息）
 - `pack.zip`：整合包本体；App 端安装前校验其原始字节 SHA-256，通过后才写入游戏目录
 - 标记文件 `.bundled_pack_version`（内容 `packId:packVersion`）防重复安装，换新包自动重装
 

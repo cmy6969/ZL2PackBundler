@@ -10,6 +10,7 @@ public sealed record PackReport(
     PackFormat Format,
     BaseApkKind BaseApkKind,
     string Name,
+    string? Author,
     string? McVersion,
     long PackZipBytes,
     long FinalApkBytes,
