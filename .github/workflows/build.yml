@@ -1,15 +1,15 @@
 name: build
 
+# 仅手动触发（Actions 页面 Run workflow）；不随 push/tag 自动构建，也不自动创建 Release
 on:
-  push:
-    tags: [ 'v*' ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
     permissions:
-      contents: write
+      actions: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -50,6 +50,7 @@ jobs:
       - name: Publish CLI (single-file)
         run: dotnet publish src/ZL2PackBundler.Cli -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish/win-x64
 
+      # 产物只作为构建运行附件（run 的 Artifacts 下载），不发布到 Releases
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -57,12 +58,3 @@ jobs:
           path: |
             publish/win-x64/ZL2PackBundler.App.exe
             publish/win-x64/zl2packbundler.exe
-
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            publish/win-x64/ZL2PackBundler.App.exe
-            publish/win-x64/zl2packbundler.exe
-          generate_release_notes: true
