@@ -29,6 +29,8 @@ public static class AxmlPatcher
     private const uint ResStringPoolUtf8 = 0x00000100;
     private const uint NoIndex = 0xFFFFFFFF;
     private const byte TypeString = 0x03;
+    private const byte TypeIntDec = 0x10;      // 枚举/整数属性（如 launchMode）
+    private const byte TypeIntBoolean = 0x12;  // 布尔属性（如 exported）
 
     public const string InstallerActivityName = "com.zl2packbundler.installer.BundledPackInstaller";
 
@@ -356,8 +358,9 @@ public static class AxmlPatcher
         var pool = doc.Pool;
         var activity = NewElement(doc, androidNs, "activity");
         activity.Attrs.Add(Attr(pool, androidNs, "name", InstallerActivityName));
-        activity.Attrs.Add(Attr(pool, androidNs, "exported", "true"));
-        activity.Attrs.Add(Attr(pool, androidNs, "launchMode", "singleTask"));
+        // exported/launchMode 必须写类型化值（Android PackageParser 按 int/bool 解析）
+        activity.Attrs.Add(TypedAttr(pool, androidNs, "exported", TypeIntBoolean, NoIndex));
+        activity.Attrs.Add(TypedAttr(pool, androidNs, "launchMode", TypeIntDec, 2)); // 2 = singleTask
 
         var filter = NewElement(doc, androidNs, "intent-filter");
         var action = NewElement(doc, androidNs, "action");
@@ -387,6 +390,11 @@ public static class AxmlPatcher
         var valueIdx = pool.Intern(value);
         return (androidNs, pool.Intern(name), valueIdx, TypeString, valueIdx);
     }
+
+    /// <summary>类型化属性（无 raw 字符串，与 aapt2 输出一致）。</summary>
+    private static (uint Ns, uint Name, uint RawValue, byte Type, uint Data) TypedAttr(
+        StringPool pool, uint androidNs, string name, byte type, uint data)
+        => (androidNs, pool.Intern(name), NoIndex, type, data);
 
     // ---------- 序列化 ----------
 

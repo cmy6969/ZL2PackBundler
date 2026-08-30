@@ -59,6 +59,36 @@ public class OfficialApkTests
         Assert.True(AxmlPatcher.HasInstallerActivity(again, "com.movtery.zalithlauncher.v2.debug"));
     }
 
+    [Fact]
+    public void InstallerActivityUsesTypedLaunchModeAndExported()
+    {
+        var bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "AndroidManifest.bin"));
+        var patched = AxmlPatcher.ApplyPatch(bytes, "com.movtery.zalithlauncher.v2.debug");
+        var doc = AxmlPatcher.Parse(patched);
+
+        var installer = FindByName(doc.Roots, "activity", AxmlPatcher.InstallerActivityName, doc.Pool);
+        Assert.NotNull(installer);
+        var launchMode = installer!.Attrs.FirstOrDefault(a => doc.Pool.Strings[(int)a.Name] == "launchMode");
+        Assert.Equal(0x10, launchMode.Type);
+        Assert.Equal(2u, launchMode.Data);
+        Assert.Equal(0xFFFFFFFFu, launchMode.RawValue);
+        var exported = installer.Attrs.FirstOrDefault(a => doc.Pool.Strings[(int)a.Name] == "exported");
+        Assert.Equal(0x12, exported.Type);
+    }
+
+    private static AxmlPatcher.Node? FindByName(List<AxmlPatcher.Node> nodes, string element, string nameValue, AxmlPatcher.StringPool pool)
+    {
+        foreach (var n in nodes)
+        {
+            if (n.Kind == 0x0102 && pool.Strings[(int)n.NameIdx] == element
+                && n.Attrs.Any(a => pool.Strings[(int)a.Name] == "name" && a.RawValue != 0xFFFFFFFF && pool.Strings[(int)a.RawValue] == nameValue))
+                return n;
+            var hit = FindByName(n.Children, element, nameValue, pool);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
     private static string MakeApk(string name, params (string Entry, string Content)[] entries)
     {
         var apk = Path.Combine(Path.GetTempPath(), "zl2pb-" + name + "-" + Guid.NewGuid().ToString("N") + ".apk");
