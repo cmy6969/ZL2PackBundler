@@ -79,7 +79,15 @@ public class BundledPackInstaller extends Activity {
         manifest = readManifest();
 
         if (launcherActivity.isEmpty() || manifest == null || !manifest.valid()) {
-            showConfigError();
+            String reason = "配置缺失";
+            if (!launcherActivity.isEmpty() && manifest != null) {
+                reason = "manifest 校验失败 (schema=" + manifest.schema + ", type=" + manifest.type
+                        + ", packId=" + manifest.packId + ", sha256=" + manifest.sha256
+                        + ", sizeBytes=" + manifest.sizeBytes + ")";
+            } else if (!launcherActivity.isEmpty()) {
+                reason = "整合包 manifest 缺失或无法解析";
+            }
+            showConfigError(reason);
             return;
         }
 
@@ -93,14 +101,20 @@ public class BundledPackInstaller extends Activity {
         startInstall();
     }
 
-    private void showConfigError() {
+    private void showConfigError(String reason) {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
+        int pad = dp(24);
+        root.setPadding(pad, pad, pad, pad);
         TextView title = new TextView(this);
         title.setTextSize(18f);
         title.setText("内嵌整合包配置缺失或损坏");
         root.addView(title);
+        TextView detail = new TextView(this);
+        detail.setTextSize(13f);
+        detail.setText("原因：" + reason);
+        root.addView(detail);
         TextView hint = new TextView(this);
         hint.setTextSize(13f);
         hint.setText("请使用最新版 ZL2PackBundler 重新打包此 APK。");
