@@ -309,9 +309,20 @@ public class BundledPackInstaller extends Activity {
     }
 
     private void checkFreeSpace(File dir, long packBytes) {
-        StatFs stat = new StatFs(dir.getAbsolutePath());
-        long free = stat.getAvailableBytes();
-        if (free < packBytes * 3 / 2) {
+        // 部分 ROM 对“尚不存在”的目录做 StatFs 会抛 Invalid path——先创建目录再检查
+        dir.mkdirs();
+        long free = -1;
+        try {
+            free = new StatFs(dir.getAbsolutePath()).getAvailableBytes();
+        } catch (Throwable t) {
+            try {
+                File parent = dir.getParentFile();
+                free = new StatFs(parent != null ? parent.getAbsolutePath() : "/").getAvailableBytes();
+            } catch (Throwable ignored) {
+                free = -1; // 仍失败则跳过空间检查（解压阶段 IO 异常会自然暴露）
+            }
+        }
+        if (free >= 0 && free < packBytes * 3 / 2) {
             throw new IllegalStateException("磁盘空间不足");
         }
     }
