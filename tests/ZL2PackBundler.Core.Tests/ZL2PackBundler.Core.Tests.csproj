@@ -24,4 +24,8 @@
     <ProjectReference Include="..\..\src\ZL2PackBundler.Core\ZL2PackBundler.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

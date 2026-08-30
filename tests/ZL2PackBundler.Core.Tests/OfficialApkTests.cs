@@ -31,38 +31,32 @@ public class OfficialApkTests
     }
 
     [Fact]
-    public void ManifestParseAndPatchRoundTrip()
+    public void AxmlPatcherAnalyzesRealManifest()
     {
-        var xml = """
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.app">
-    <application>
-        <activity android:name=".SplashActivity" android:label="@string/app_name" android:icon="@mipmap/ic_launcher">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-        <activity-alias android:name=".ImportAlias" android:exported="true">
-            <meta-data android:name="import_type" android:value="modpack" />
-        </activity-alias>
-    </application>
-</manifest>
-""";
-        var info = ManifestPatcher.Parse(xml);
-        Assert.Equal("com.example.app", info.Package);
-        Assert.Equal("com.example.app.SplashActivity", info.LauncherName);
+        // 夹具来自 ZL2 上游 2.4.11 调试构建的二进制 AndroidManifest.xml
+        var bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "AndroidManifest.bin"));
+        var info = AxmlPatcher.Analyze(bytes, "com.movtery.zalithlauncher.v2.debug");
+        Assert.Equal("com.movtery.zalithlauncher.v2.debug", info.Package);
+        Assert.Equal("com.movtery.zalithlauncher.ui.activities.SplashActivity", info.LauncherName);
         Assert.Equal("activity", info.LauncherKind);
-        Assert.Equal("com.example.app.ImportAlias", info.ImportAlias);
+        Assert.Equal("com.movtery.activity.ImportModpackActivity", info.ImportAlias);
+        Assert.False(AxmlPatcher.HasInstallerActivity(bytes, "com.movtery.zalithlauncher.v2.debug"));
+    }
 
-        var removed = ManifestPatcher.RemoveLauncherFilter(xml);
-        Assert.DoesNotContain("android.intent.category.LAUNCHER", removed);
+    [Fact]
+    public void AxmlPatcherAppliesAndRoundTrips()
+    {
+        var bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "AndroidManifest.bin"));
+        var patched = AxmlPatcher.ApplyPatch(bytes, "com.movtery.zalithlauncher.v2.debug");
 
-        var patched = ManifestPatcher.AddInstallerActivity(removed, info);
-        Assert.Contains(ManifestPatcher.InstallerActivityName, patched);
-        Assert.Contains("android:name=\u0022.SplashActivity\u0022", patched);
-        Assert.Contains("android.intent.action.MAIN", patched); // 安装器承接 LAUNCHER
-        Assert.True(ManifestPatcher.HasInstallerActivity(patched));
+        // 修补后：安装器成为 LAUNCHER，且解析/重写可往返
+        Assert.True(AxmlPatcher.HasInstallerActivity(patched, "com.movtery.zalithlauncher.v2.debug"));
+        var info = AxmlPatcher.Analyze(patched, "com.movtery.zalithlauncher.v2.debug");
+        Assert.Equal(AxmlPatcher.InstallerActivityName, info.LauncherName);
+
+        // 再解析一遍（往返稳定）
+        var again = AxmlPatcher.ApplyPatch(patched, "com.movtery.zalithlauncher.v2.debug");
+        Assert.True(AxmlPatcher.HasInstallerActivity(again, "com.movtery.zalithlauncher.v2.debug"));
     }
 
     private static string MakeApk(string name, params (string Entry, string Content)[] entries)

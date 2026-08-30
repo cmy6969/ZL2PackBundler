@@ -61,11 +61,12 @@ public static class ApktoolRunner
     }
 
     /// <summary>
-    /// 解码 APK（-s 跳过 smali，速度较快；必须解码资源，否则 AndroidManifest.xml 保持二进制无法修补）。
+    /// 解码 APK：-r 不重建资源（资源保持原样，构建时不跑 aapt2，避开 Material 等库属性链接失败），
+    /// -s 跳过 smali。清单以二进制形式保留，由 AxmlPatcher 直接修补。
     /// </summary>
     public static void Decode(string apkPath, string outDir, string sdkBuildToolsDir, Action<string>? log = null)
     {
-        Run(new[] { "d", "-f", "-s", apkPath, "-o", outDir }, sdkBuildToolsDir, log);
+        Run(new[] { "d", "-f", "-r", "-s", apkPath, "-o", outDir }, sdkBuildToolsDir, log);
     }
 
     public static void Build(string projectDir, string outputApk, string sdkBuildToolsDir, Action<string>? log = null)

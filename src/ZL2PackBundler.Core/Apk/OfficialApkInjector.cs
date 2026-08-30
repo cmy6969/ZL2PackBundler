@@ -9,7 +9,7 @@ public sealed class InjectionResult
     public string? DexFilePath { get; init; }
     /// <summary>写入 assets/zl2packbundler/installer-config.json 的内容；未注入时为 null。</summary>
     public string? InstallerConfigJson { get; init; }
-    public required ManifestInfo ManifestInfo { get; init; }
+    public AxmlPatcher.AxmlInfo? ManifestInfo { get; init; }
 }
 
 /// <summary>
@@ -27,28 +27,23 @@ public static class OfficialApkInjector
 
         var manifestPath = Path.Combine(decodedDir, "AndroidManifest.xml");
         if (!File.Exists(manifestPath))
-            throw new InvalidDataException("apktool 未产出 AndroidManifest.xml。");
+            throw new InvalidDataException("apktool 未产出 AndroidManifest.xml（-r 模式下应为二进制清单）。");
 
-        var xml = File.ReadAllText(manifestPath);
+        var manifestBytes = File.ReadAllBytes(manifestPath);
         var packageName = AndroidBuildTools.GetPackageName(baseApk, sdkBuildToolsDir);
-        if (ManifestPatcher.HasInstallerActivity(xml))
+
+        if (AxmlPatcher.HasInstallerActivity(manifestBytes, packageName))
         {
             // 已注入过：直接复用（幂等）
-            return new InjectionResult
-            {
-                BaseApkPath = baseApk,
-                ManifestInfo = ManifestPatcher.Parse(xml, packageName)
-            };
+            return new InjectionResult { BaseApkPath = baseApk };
         }
 
-        var info = ManifestPatcher.Parse(xml, packageName);
+        var info = AxmlPatcher.Analyze(manifestBytes, packageName);
         log?.Invoke($"检测到官方原版 APK：启动入口 {info.LauncherName}（{info.LauncherKind}），包名 {info.Package}");
 
-        xml = ManifestPatcher.RemoveLauncherFilter(xml);
-        xml = ManifestPatcher.AddInstallerActivity(xml, info);
-        File.WriteAllText(manifestPath, xml, new System.Text.UTF8Encoding(false));
+        File.WriteAllBytes(manifestPath, AxmlPatcher.ApplyPatch(manifestBytes, packageName));
 
-        log?.Invoke("apktool 重新打包…");
+        log?.Invoke("apktool 重新打包（资源保持原样，不重建）…");
         var patchedApk = Path.Combine(workDir, "patched.apk");
         ApktoolRunner.Build(decodedDir, patchedApk, sdkBuildToolsDir, log);
 
