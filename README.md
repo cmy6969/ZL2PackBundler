@@ -1,8 +1,12 @@
 # ZL2PackBundler — 整合包内嵌 APK 工具
 
+> English: [README_EN.md](README_EN.md)
+
 把 Minecraft 整合包直接嵌入 Zalith Launcher 2（ZL2）的 APK：玩家安装后首次启动自动解包/导入，**无需二次下载整合包，直接游玩**（配合完整游戏目录可完全离线）。
 
 > 本项目是独立工具，与 [ZalithLauncher/ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2) 官方项目**无隶属关系**。本仓库不包含 ZL2 应用源码，只提供接入补丁（见 [android/](android/)）。
+
+> **开发说明**：本工具由 AI 助手（DeepSeek）完成开发——架构设计、编码、测试与文档均由 AI 在仓库所有者（cmy6969）的需求驱动下逐轮迭代完成；仓库所有者负责提出需求、发布分发与合规事项。This tool was developed by the DeepSeek AI assistant.
 
 ## 工作原理
 
@@ -52,7 +56,7 @@ docs/                         设计规格 / 实施计划 / ADR
 
 ## 下载使用（Releases 便携版）
 
-从 [Releases](../../releases) 下载单个 exe 双击即用，**无需安装 .NET/JDK/Android SDK**（内置精简 JRE、zipalign/aapt2/apksigner，首次运行自动解包）：
+便携版 exe 由仓库所有者按需发布到 [Releases](../../releases)，下载单个 exe 双击即用，**无需安装 .NET/JDK/Android SDK**（内置精简 JRE、zipalign/aapt2/apksigner，首次运行自动解包）；也可以按下方「单文件发布」命令自行构建：
 
 - `ZL2PackBundler.App.exe` — 图形界面（四步向导）
 - `zl2packbundler.exe` — 命令行
@@ -63,7 +67,7 @@ docs/                         设计规格 / 实施计划 / ADR
 
 ```bash
 dotnet build ZL2PackBundler.sln -c Release
-dotnet test ZL2PackBundler.sln -c Release      # 29 个单元测试
+dotnet test ZL2PackBundler.sln -c Release      # 47 个单元测试
 bash scripts/integration-test.sh               # 端到端：嵌入→签名→校验（Git Bash）
 
 # 便携运行时内嵌（否则开发构建回退使用本机 JDK/Android SDK）
@@ -75,7 +79,7 @@ dotnet publish src/ZL2PackBundler.App -c Release -r win-x64 --self-contained tru
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64
 ```
 
-推送 `v*` 标签（如 `v1.0.0`）后，GitHub Actions 会自动构建测试并把两个 exe 附加到 Release。
+GitHub Actions 工作流仅支持手动触发（Actions 页面 → Run workflow），构建产物只作为工作流附件（Artifacts）上传，**不会自动发布到 Releases**；发布便携 exe 需手动操作。
 
 ## 完整出包流程
 
