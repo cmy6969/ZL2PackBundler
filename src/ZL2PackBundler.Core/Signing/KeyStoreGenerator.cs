@@ -16,7 +16,7 @@ public static class KeyStoreGenerator
         var aliasName = alias ?? "zl2packbundler";
         var pass = password ?? ApkSigner.AutoKeyStorePassword;
 
-        if (File.Exists(outputPath) && !IsUsable(outputPath, pass))
+        if (File.Exists(outputPath) && !IsUsable(outputPath, aliasName, pass))
         {
             log?.Invoke("检测到损坏的 keystore（别名无私钥），自动重新生成…");
             File.Delete(outputPath);
@@ -78,8 +78,29 @@ public static class KeyStoreGenerator
         return null;
     }
 
-    private static bool IsUsable(string path, string password)
+    private static bool IsUsable(string path, string alias, string password)
     {
+        // 决定性校验：keytool -list 的条目类型——PrivateKeyEntry 才带私钥（cert-only 是 trustedCertEntry）
+        var keytool = LocateKeytool();
+        if (keytool != null)
+        {
+            try
+            {
+                var output = ProcessRunner.Run(keytool, new[]
+                {
+                    "-list", "-keystore", path,
+                    "-storepass", password,
+                    "-alias", alias
+                }, null, TimeSpan.FromMinutes(2));
+                return output.Contains("PrivateKeyEntry", StringComparison.Ordinal);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // 无 keytool 时退化为 .NET 检查（不如 keytool 精确，但聊胜于无）
         try
         {
             using var cert = new X509Certificate2(path, password, X509KeyStorageFlags.Exportable);
