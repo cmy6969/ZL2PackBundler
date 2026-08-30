@@ -24,10 +24,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK (仅需 build-tools：zipalign/aapt2/apksigner)
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platforms;android-37 build-tools;36.1.0'
+          packages: 'build-tools;36.0.0'
 
       - name: Download apktool
         run: |
@@ -38,7 +38,7 @@ jobs:
         run: |
           powershell -ExecutionPolicy Bypass -File scripts/build-bundled-runtime.ps1 `
             -ApktoolJar apktool.jar `
-            -BuildTools "$env:ANDROID_HOME\build-tools\36.1.0" `
+            -BuildTools "$env:ANDROID_HOME\build-tools\36.0.0" `
             -JdkHome "$env:JAVA_HOME"
 
       - name: Test
