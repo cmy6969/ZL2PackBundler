@@ -61,6 +61,8 @@ docs/                         设计规格 / 实施计划 / ADR
 - `ZL2PackBundler.App.exe` — 图形界面（四步向导）
 - `zl2packbundler.exe` — 命令行
 
+Releases 同时提供**带内嵌整合包补丁的 ZL2 APK**（已按 GPL 附加条款在构建期重命名，可直接作为基础 APK 使用，见 [android/](android/)）。
+
 仅要求 Windows 10/11 x64。
 
 ## 构建与测试（开发者）

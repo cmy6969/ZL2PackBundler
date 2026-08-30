@@ -61,6 +61,8 @@ Portable exes are published to [Releases](../../releases) by the repository owne
 - `ZL2PackBundler.App.exe` — GUI (4-step wizard)
 - `zl2packbundler.exe` — command line
 
+Releases also include a **ZL2 APK with the bundled-modpack patch applied** (renamed at build time per the GPL additional terms; it can be used directly as the base APK, see [android/](android/)).
+
 Windows 10/11 x64 only.
 
 ## Build & test (developers)
