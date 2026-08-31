@@ -2,7 +2,7 @@
 
 本目录提供 ZL2 应用端的改动，使启动器能识别并安装 APK 内嵌的整合包（`assets/bundled_pack/`）。
 
-> 基准版本：基于 [ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2) 上游提交 `87481daf`（v2.4.11）生成。上游有更新时如遇冲突，请按文件手工合并。
+> 基准版本：基于 [ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2) 上游 Releases 标签 `2.4.11`（提交 `adbfbaa`）生成。上游有更新时如遇冲突，请按文件手工合并。
 
 ## 改动内容
 
