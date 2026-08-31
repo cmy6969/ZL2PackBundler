@@ -20,6 +20,74 @@ public static class ArscResolver
     private const ushort FlagComplex = 0x0001;
     private const ushort FlagCompact = 0x0008;
 
+    /// <summary>
+    /// 按类型名 + 条目名查找资源 ID（如 drawable/img_launcher → 0x7f08xxxx）。
+    /// 找不到返回 null。typeNames 池索引即 type id（aapt2 约定）。
+    /// </summary>
+    public static uint? ResolveResourceId(byte[] arsc, string typeName, string entryName)
+    {
+        var off = 12;
+        off += (int)ReadU32(arsc, off + 4); // 跳过全局字符串池
+        while (off + 8 <= arsc.Length)
+        {
+            if (ReadU16(arsc, off) != ResTablePackage) return null;
+            var pkgSize = (int)ReadU32(arsc, off + 4);
+            var pkgId = ReadU32(arsc, off + 8);
+            var headerSize = ReadU16(arsc, off + 2);
+            var nameBytes = headerSize - 8 - 4 - 20;
+            var typeStringsOff = (int)ReadU32(arsc, off + 12 + nameBytes);
+            var keyStringsOff = (int)ReadU32(arsc, off + 12 + nameBytes + 8);
+            var typeNames = ReadStringPool(arsc, off + typeStringsOff) ?? new List<string>();
+            var keyNames = ReadStringPool(arsc, off + keyStringsOff) ?? new List<string>();
+            var typeIdx = typeNames.IndexOf(typeName);
+            var keyIdx = keyNames.IndexOf(entryName);
+            if (typeIdx < 0 || keyIdx < 0)
+            {
+                off += pkgSize;
+                continue;
+            }
+            var typeId = (byte)(typeIdx + 1); // 池索引 0 = type id 1（AOSP：typeStrings 按 typeId-1 索引）
+            var o = off + headerSize;
+            var end = off + pkgSize;
+            while (o + 20 <= end)
+            {
+                var chunkType = ReadU16(arsc, o);
+                var chunkSize = (int)ReadU32(arsc, o + 4);
+                if (chunkSize < 8) break;
+                if (chunkType == ResStringPool)
+                {
+                    o += chunkSize;
+                    continue;
+                }
+                if (chunkType == ResTableType && ReadU8(arsc, o + 8) == typeId)
+                {
+                    var entryCount = (int)ReadU32(arsc, o + 12);
+                    var entriesStart = (int)ReadU32(arsc, o + 16);
+                    var configSize = ReadU16(arsc, o + 2) - 20;
+                    for (var i = 0; i < entryCount; i++)
+                    {
+                        var entryOff = ReadU32(arsc, o + 20 + configSize + i * 4);
+                        if (entryOff == NoEntry) continue;
+                        var entry = o + entriesStart + (int)entryOff;
+                        var flags = ReadU16(arsc, entry + 2);
+                        uint keyIndex = (flags & FlagCompact) != 0
+                            ? (uint)i
+                            : ReadU32(arsc, entry + 4);
+                        if (keyIndex == keyIdx)
+                            return (pkgId << 24) | ((uint)typeId << 16) | (uint)i;
+                    }
+                }
+                else if (chunkType is not (ResTableType or ResTableTypeSpec))
+                {
+                    break;
+                }
+                o += chunkSize;
+            }
+            off += pkgSize;
+        }
+        return null;
+    }
+
     /// <summary>解析资源 ID → 文件路径（去重，保持 config 顺序）。别名（REFERENCE）自动跟随。</summary>
     public static List<string> ResolveFilePaths(byte[] arsc, uint resourceId, int maxDepth = 8)
     {

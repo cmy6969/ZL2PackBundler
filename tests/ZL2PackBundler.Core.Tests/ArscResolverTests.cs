@@ -50,6 +50,100 @@ public class ArscResolverTests
     internal static byte[] BuildArsc()
         => BuildArsc(null);
 
+    /// <summary>
+    /// 构造带宿主位图 drawable（img_launcher → 0x7f020000）的 arsc：
+    /// mipmap(0x0f) ic_launcher 两个 config（iconPaths[0]/[1]）；drawable(0x02) img_launcher → global[2]。
+    /// </summary>
+    internal static byte[] BuildArscWithHostDrawable(string[] iconPaths)
+    {
+        var globalStrings = new[] { iconPaths[0], iconPaths[1], "res/img_launcher.png" };
+        var typeStrings = new[] { "mipmap", "drawable" };
+        var keyStrings = new[] { "ic_launcher", "img_launcher" };
+
+        var globalPool = BuildUtf8StringPool(globalStrings);
+        var typePool = BuildUtf8StringPool(typeStrings);
+        var keyPool = BuildUtf8StringPool(keyStrings);
+
+        var typeA = BuildTypeChunk(0x0f, 1, new[] { (0, (byte)0x03, (uint)0) });
+        var typeB = BuildTypeChunk(0x0f, 1, new[] { (0, (byte)0x03, (uint)1) });
+        var typeDrawable = BuildTypeChunkKeys(0x02, 1, new[] { (0, (byte)0x03, (uint)2, 1) });
+
+        return AssembleTable(globalPool, typePool, keyPool, new[] { typeA, typeB, typeDrawable });
+    }
+
+    private static byte[] AssembleTable(byte[] globalPool, byte[] typePool, byte[] keyPool, IReadOnlyList<byte[]> chunks)
+    {
+        const int packageHeaderSize = 8 + 4 + 256 + 20;
+        var packageName = new byte[256];
+        var packageBody = new List<byte>();
+        packageBody.AddRange(BitConverter.GetBytes((ushort)0x0200));
+        packageBody.AddRange(BitConverter.GetBytes((ushort)packageHeaderSize));
+        packageBody.AddRange(new byte[4]); // size 占位
+        packageBody.AddRange(BitConverter.GetBytes(0x7fu));
+        packageBody.AddRange(packageName);
+        uint chunksLen = 0;
+        foreach (var c in chunks) chunksLen += (uint)c.Length;
+        var typeStringsOff = (uint)(packageHeaderSize + chunksLen);
+        var keyStringsOff = typeStringsOff + (uint)typePool.Length;
+        packageBody.AddRange(BitConverter.GetBytes(typeStringsOff));
+        packageBody.AddRange(BitConverter.GetBytes(0u));
+        packageBody.AddRange(BitConverter.GetBytes(keyStringsOff));
+        packageBody.AddRange(BitConverter.GetBytes(0u));
+        packageBody.AddRange(BitConverter.GetBytes(0u));
+        foreach (var c in chunks) packageBody.AddRange(c);
+        packageBody.AddRange(typePool);
+        packageBody.AddRange(keyPool);
+        OverwriteU32(packageBody, 4, (uint)packageBody.Count);
+
+        var table = new List<byte>();
+        table.AddRange(BitConverter.GetBytes((ushort)0x0002)); // RES_TABLE_TYPE
+        table.AddRange(BitConverter.GetBytes((ushort)12));
+        table.AddRange(new byte[4]);
+        table.AddRange(BitConverter.GetBytes(1u));
+        table.AddRange(globalPool);
+        table.AddRange(packageBody);
+        OverwriteU32(table, 4, (uint)table.Count);
+        return table.ToArray();
+    }
+
+    private static byte[] BuildTypeChunkKeys(byte typeId, int entryCount,
+        (int EntryId, byte DataType, uint Data, int KeyIndex)[] entries)
+    {
+        const int configSize = 64;
+        const int headerSize = 20 + configSize;
+        var entryData = new List<byte>();
+        var offsets = new List<uint>();
+        for (var i = 0; i < entryCount; i++) offsets.Add(0xFFFFFFFFu);
+        foreach (var (entryId, dataType, data, keyIndex) in entries)
+        {
+            offsets[entryId] = (uint)entryData.Count;
+            entryData.AddRange(BitConverter.GetBytes((ushort)16));
+            entryData.AddRange(BitConverter.GetBytes((ushort)0));
+            entryData.AddRange(BitConverter.GetBytes((uint)keyIndex));
+            entryData.AddRange(BitConverter.GetBytes((ushort)8));
+            entryData.Add(0);
+            entryData.Add(dataType);
+            entryData.AddRange(BitConverter.GetBytes(data));
+        }
+        var ms = new List<byte>();
+        ms.AddRange(BitConverter.GetBytes((ushort)0x0201));
+        ms.AddRange(BitConverter.GetBytes((ushort)headerSize));
+        ms.AddRange(new byte[4]);
+        ms.Add(typeId);
+        ms.Add(0);
+        ms.AddRange(BitConverter.GetBytes((ushort)0));
+        ms.AddRange(BitConverter.GetBytes((uint)entryCount));
+        ms.AddRange(BitConverter.GetBytes((uint)(headerSize + entryCount * 4)));
+        var config = new byte[configSize];
+        BitConverter.GetBytes((uint)configSize).CopyTo(config, 0);
+        BitConverter.GetBytes((ushort)320).CopyTo(config, 14);
+        ms.AddRange(config);
+        foreach (var off in offsets) ms.AddRange(BitConverter.GetBytes(off));
+        ms.AddRange(entryData);
+        OverwriteU32(ms, 4, (uint)ms.Count);
+        return ms.ToArray();
+    }
+
     /// <summary>可选自定义 ic_launcher 的文件路径：[0]=anydpi 配置，[1]=密度桶配置（模拟 shrinkResources 的短路径）。</summary>
     internal static byte[] BuildArsc(string[]? iconPaths)
     {

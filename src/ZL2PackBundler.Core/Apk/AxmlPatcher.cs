@@ -151,6 +151,86 @@ public static class AxmlPatcher
         return Serialize(doc);
     }
 
+    /// <summary>
+    /// 重写自适应图标 XML：foreground 的 drawable 引用替换为指定资源 ID（指向已被替换为用户图标的位图），
+    /// 移除 monochrome 子元素（避免 Android 13+ 主题图标继续显示旧图标）。background 保持原样。
+    /// </summary>
+    internal static byte[] RewriteAdaptiveIcon(byte[] originalXml, uint foregroundRef)
+    {
+        var doc = Parse(originalXml);
+        var androidNs = (uint)(doc.Pool.GetIndex("http://schemas.android.com/apk/res/android")
+            ?? throw new InvalidDataException("自适应图标 XML 中缺少 android 命名空间。"));
+        Node? adaptive = null;
+        foreach (var root in doc.Roots)
+        {
+            adaptive = FindAdaptiveIcon(root, androidNs, doc.Pool);
+            if (adaptive != null) break;
+        }
+        if (adaptive == null)
+            throw new InvalidDataException("自适应图标 XML 中未找到 adaptive-icon 元素。");
+
+        Node? foreground = null;
+        for (var i = adaptive.Children.Count - 1; i >= 0; i--)
+        {
+            var child = adaptive.Children[i];
+            if (IsElement(child, "monochrome", androidNs, doc.Pool))
+            {
+                adaptive.Children.RemoveAt(i); // 主题图标：移除旧的 monochrome
+                continue;
+            }
+            if (IsElement(child, "foreground", androidNs, doc.Pool)) foreground = child;
+        }
+        if (foreground == null)
+        {
+            foreground = NewElement(doc, androidNs, "foreground");
+            adaptive.Children.Add(foreground);
+        }
+        SetAttrReference(foreground, doc.Pool, androidNs, "drawable", foregroundRef);
+        return Serialize(doc);
+    }
+
+    /// <summary>读取子元素（按元素名）的 drawable 引用 ID；不存在返回 null。</summary>
+    internal static uint? GetChildDrawableRef(Node parent, StringPool pool, uint androidNs, string elementName)
+    {
+        foreach (var child in parent.Children)
+        {
+            if (IsElement(child, elementName, androidNs, pool))
+                return GetAttrReference(child, pool, androidNs, "drawable");
+        }
+        return null;
+    }
+
+    /// <summary>设置/替换资源引用属性（TYPE_REFERENCE，无 raw 字符串）。</summary>
+    private static void SetAttrReference(Node node, StringPool pool, uint androidNs, string name, uint resId)
+    {
+        var nameIdx = pool.Intern(name);
+        for (var i = 0; i < node.Attrs.Count; i++)
+        {
+            var (ns, idx, _, _, _) = node.Attrs[i];
+            if ((ns == androidNs || ns == NoIndex) && pool.Strings[(int)idx] == name)
+            {
+                node.Attrs[i] = (ns, idx, NoIndex, 0x01 /* TYPE_REFERENCE */, resId);
+                return;
+            }
+        }
+        node.Attrs.Add((androidNs, nameIdx, NoIndex, 0x01, resId));
+    }
+
+    private static Node? FindAdaptiveIcon(Node node, uint androidNs, StringPool pool)
+    {
+        if (node.Kind == ResXmlStartElement)
+        {
+            var name = pool.Strings[(int)node.NameIdx];
+            if (name == "adaptive-icon" || name == "icon") return node;
+        }
+        foreach (var child in node.Children)
+        {
+            var hit = FindAdaptiveIcon(child, androidNs, pool);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
     /// <summary>摘除原启动组件的 LAUNCHER intent-filter，并追加安装器 Activity；返回修补后的二进制。</summary>
     public static byte[] ApplyPatch(byte[] manifestBytes, string packageHint)
     {

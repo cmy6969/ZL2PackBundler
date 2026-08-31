@@ -169,8 +169,11 @@ public static class PackPipeline
                 {
                     iconSummary =
                         $"已替换 {iconReport.Replaced.Count} 个图标文件" +
+                        (iconReport.Rewritten.Count > 0
+                            ? $"、重写 {iconReport.Rewritten.Count} 个自适应图标 XML（前景指向替换后的位图）"
+                            : "") +
                         (iconReport.Removed.Count > 0
-                            ? $"（并移除 {iconReport.Removed.Count} 个自适应图标 XML，桌面将使用替换后的位图图标）"
+                            ? $"（并移除 {iconReport.Removed.Count} 个自适应图标 XML）"
                             : "");
                     iconWarnings.Add(new GuardWarning("info", "图标：" + iconSummary));
                     foreach (var skip in iconReport.Skipped)

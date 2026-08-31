@@ -4,17 +4,20 @@ namespace ZL2PackBundler.Core.Apk;
 public sealed class IconPatchResult
 {
     public List<string> Replaced { get; } = new();
+    public List<string> Rewritten { get; } = new();
     public List<string> Removed { get; } = new();
     public List<string> Skipped { get; } = new();
-    public bool Changed => Replaced.Count > 0 || Removed.Count > 0;
+    public bool Changed => Replaced.Count > 0 || Rewritten.Count > 0 || Removed.Count > 0;
 }
 
 /// <summary>
 /// 应用图标替换（不重建 resources.arsc）：
 /// 1. 从二进制清单取 application 的 android:icon / android:roundIcon 资源引用 ID；
-/// 2. 用 resources.arsc 把 ID 解析为各 config 下的文件路径（如 res/mipmap-xxxhdpi/ic_launcher.webp）；
+/// 2. 用 resources.arsc 把 ID 解析为各 config 下的文件路径；
 /// 3. 位图条目（webp/png）用用户图标按原始尺寸重编码替换；
-/// 4. 自适应图标 XML（anydpi）直接移除 —— 设备回退到已替换的位图条目，从而显示新图标。
+/// 4. 自适应图标 XML 不删除（删除会导致按默认密度请求图标的启动器解析到缺失文件、
+///    回退成安卓默认机器人图标），而是重写：foreground 指向一个“宿主”位图 drawable
+///    （默认 img_launcher，我们把它替换成用户图标），并移除 monochrome 子元素。
 /// 返回 zip 条目覆盖表：值 = 新字节；null = 删除条目（交给 ApkRebuilder）。
 /// </summary>
 public static class IconPatcher
@@ -48,6 +51,26 @@ public static class IconPatcher
             return result;
         }
 
+        // 找一个可承载用户图标的“宿主”位图 drawable（默认配置，任何请求密度都能解析到文件）。
+        // ZL2 的 drawable/img_launcher 是理想选择（About 页启动器图标会同步变成新图标）。
+        uint? hostDrawableId = null;
+        foreach (var candidate in new[] { "img_launcher" })
+        {
+            hostDrawableId = ArscResolver.ResolveResourceId(arscBytes, "drawable", candidate);
+            if (hostDrawableId != null) break;
+        }
+        var hostFiles = hostDrawableId != null
+            ? ArscResolver.ResolveFilePaths(arscBytes, hostDrawableId.Value)
+            : new List<string>();
+        var hostBitmaps = hostFiles
+            .Where(f => f.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                || f.EndsWith(".webp", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (hostDrawableId == null || hostBitmaps.Count == 0)
+        {
+            result.Skipped.Add("未找到可承载图标的位图 drawable（img_launcher），自适应图标 XML 将按旧逻辑移除");
+        }
+
         foreach (var id in iconIds.Distinct())
         {
             var files = ArscResolver.ResolveFilePaths(arscBytes, id);
@@ -67,11 +90,19 @@ public static class IconPatcher
                     if (lower.Contains("anydpi", StringComparison.Ordinal)
                         || (xmlBytes != null && IsAdaptiveIconXml(xmlBytes)))
                     {
-                        // 移除自适应图标 XML：让所有版本回退到已替换的位图图标
-                        if (entryNames.Contains(file))
+                        if (entryNames.Contains(file) && xmlBytes != null)
                         {
-                            entryOverrides[file] = null;
-                            result.Removed.Add(file);
+                            if (hostDrawableId != null && hostBitmaps.Count > 0)
+                            {
+                                // 重写自适应图标：foreground → 宿主位图（已被替换成用户图标），移除 monochrome
+                                entryOverrides[file] = AxmlPatcher.RewriteAdaptiveIcon(xmlBytes, hostDrawableId.Value);
+                                result.Rewritten.Add(file);
+                            }
+                            else
+                            {
+                                entryOverrides[file] = null;
+                                result.Removed.Add(file);
+                            }
                         }
                         continue;
                     }
@@ -97,6 +128,19 @@ public static class IconPatcher
                 entryOverrides[file] = IconImageOps.ResizeSquare(userIcon, w, h, lower.EndsWith(".webp", StringComparison.Ordinal));
                 result.Replaced.Add(file);
             }
+        }
+
+        // 替换宿主位图（自适应图标 foreground 会指向它）
+        foreach (var file in hostBitmaps)
+        {
+            if (!entryNames.Contains(file)) continue;
+            var original = readEntry(file);
+            if (original == null) continue;
+            var (w, h) = IconImageOps.GetDimensions(original);
+            if (w <= 0 || h <= 0) continue;
+            entryOverrides[file] = IconImageOps.ResizeSquare(
+                userIcon, w, h, file.EndsWith(".webp", StringComparison.OrdinalIgnoreCase));
+            result.Replaced.Add(file);
         }
         return result;
     }

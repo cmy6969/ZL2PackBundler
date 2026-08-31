@@ -69,16 +69,16 @@ public class IconPatcherTests
     }
 
     [Fact]
-    public void RemovesAdaptiveIconXmlEvenWithShrunkPath()
+    public void RewritesAdaptiveIconXmlWithShrunkPathAndHostBitmap()
     {
-        // shrinkResources 会把自适应图标 XML 路径缩短为 res/BW.xml（不含 anydpi），
-        // 必须按内容识别并移除，否则设备继续显示旧自适应图标（回归：图标修改未生效）。
+        // 回归：shrinkResources 缩短路径（res/BW.xml）+ 按内容识别 + 重写（而非删除）自适应图标 XML。
+        // 删除会导致按默认密度请求图标的启动器解析到缺失文件 → 安卓默认机器人图标。
         var dir = Path.Combine(Path.GetTempPath(), "zl2pb-icon3-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var manifest = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "AndroidManifest.bin"));
-            var arsc = ArscResolverTests.BuildArsc(new[] { "res/BW.xml", "res/d2.webp" });
+            var arsc = ArscResolverTests.BuildArscWithHostDrawable(new[] { "res/BW.xml", "res/d2.webp" });
             var apkPath = Path.Combine(dir, "base.apk");
             using (var zip = ZipFile.Open(apkPath, ZipArchiveMode.Create))
             {
@@ -86,6 +86,7 @@ public class IconPatcherTests
                 Write(zip, "resources.arsc", arsc);
                 Write(zip, "res/d2.webp", Encode(SKColors.Blue, 96, 96, SKEncodedImageFormat.Webp));
                 Write(zip, "res/BW.xml", BuildAdaptiveIconXml());
+                Write(zip, "res/img_launcher.png", Encode(SKColors.Green, 512, 512, SKEncodedImageFormat.Png));
             }
             var userIcon = Path.Combine(dir, "icon.png");
             File.WriteAllBytes(userIcon, Encode(SKColors.Red, 300, 200, SKEncodedImageFormat.Png));
@@ -96,10 +97,36 @@ public class IconPatcherTests
             var report = IconPatcher.Apply(manifest, arsc,
                 name => ApkRebuilder.ReadEntry(apkPath, name), entries, userIcon, out var overrides);
 
-            Assert.Contains("res/BW.xml", report.Removed);
+            Assert.Empty(report.Removed);
+            Assert.Contains("res/BW.xml", report.Rewritten);
             Assert.Contains("res/d2.webp", report.Replaced);
-            Assert.Null(overrides["res/BW.xml"]);
+            Assert.Contains("res/img_launcher.png", report.Replaced);
+
+            // 重写后的 XML：foreground → 宿主位图 0x7f020000；monochrome 移除；background 保持原引用
+            var rewritten = overrides["res/BW.xml"]!;
+            Assert.NotNull(rewritten);
+            var doc = AxmlPatcher.Parse(rewritten);
+            var androidNs = (uint)doc.Pool.GetIndex("http://schemas.android.com/apk/res/android")!;
+            AxmlPatcher.Node? adaptive = null;
+            foreach (var root in doc.Roots)
+            {
+                adaptive = FindElem(root, "adaptive-icon", doc.Pool);
+                if (adaptive != null) break;
+            }
+            Assert.NotNull(adaptive);
+            var foreground = adaptive!.Children.FirstOrDefault(
+                c => c.Kind == 0x0102 && doc.Pool.Strings[(int)c.NameIdx] == "foreground");
+            Assert.NotNull(foreground);
+            Assert.Equal(0x7f020000u, AxmlPatcher.GetAttrReference(foreground!, doc.Pool, androidNs, "drawable"));
+            var background = adaptive.Children.FirstOrDefault(
+                c => c.Kind == 0x0102 && doc.Pool.Strings[(int)c.NameIdx] == "background");
+            Assert.NotNull(background);
+            Assert.Equal(0x7f060001u, AxmlPatcher.GetAttrReference(background!, doc.Pool, androidNs, "drawable"));
+            Assert.DoesNotContain(adaptive.Children,
+                c => c.Kind == 0x0102 && doc.Pool.Strings[(int)c.NameIdx] == "monochrome");
+
             Assert.Equal((96, 96), IconImageOps.GetDimensions(overrides["res/d2.webp"]!));
+            Assert.Equal((512, 512), IconImageOps.GetDimensions(overrides["res/img_launcher.png"]!));
         }
         finally
         {
@@ -107,73 +134,128 @@ public class IconPatcherTests
         }
     }
 
-    /// <summary>最小二进制 AXML：根元素 adaptive-icon（无属性），供内容识别测试使用。</summary>
+    private static AxmlPatcher.Node? FindElem(AxmlPatcher.Node node, string name, AxmlPatcher.StringPool pool)
+    {
+        if (node.Kind == 0x0102 && pool.Strings[(int)node.NameIdx] == name) return node;
+        foreach (var child in node.Children)
+        {
+            var hit = FindElem(child, name, pool);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 最小二进制 AXML：命名空间 + adaptive-icon（background/foreground/monochrome 子元素，
+    /// 各带一个 drawable 引用属性），供内容识别与重写测试使用。
+    /// </summary>
     private static byte[] BuildAdaptiveIconXml()
     {
+        // 池：0 adaptive-icon, 1 background, 2 foreground, 3 monochrome, 4 android, 5 android URI, 6 drawable
+        var strings = new[]
+        {
+            "adaptive-icon", "background", "foreground", "monochrome",
+            "android", "http://schemas.android.com/apk/res/android", "drawable"
+        };
         var poolData = new List<byte>();
-        const string name = "adaptive-icon";
-        poolData.AddRange(BitConverter.GetBytes((ushort)name.Length));
-        poolData.AddRange(Encoding.Unicode.GetBytes(name));
-        poolData.AddRange(BitConverter.GetBytes((ushort)0));
+        var offsets = new List<uint>();
+        foreach (var s in strings)
+        {
+            offsets.Add((uint)poolData.Count);
+            poolData.AddRange(BitConverter.GetBytes((ushort)s.Length));
+            poolData.AddRange(Encoding.Unicode.GetBytes(s));
+            poolData.AddRange(BitConverter.GetBytes((ushort)0));
+        }
         while (poolData.Count % 4 != 0) poolData.Add(0);
-        const int poolHeader = 28 + 4; // header + 1 offset
+        const int poolHeader = 28 + 4 * 7;
         var pool = new List<byte>();
         pool.AddRange(BitConverter.GetBytes((ushort)0x0001));
         pool.AddRange(BitConverter.GetBytes((ushort)28));
         pool.AddRange(BitConverter.GetBytes((uint)(poolHeader + poolData.Count)));
-        pool.AddRange(BitConverter.GetBytes(1u));    // stringCount
-        pool.AddRange(BitConverter.GetBytes(0u));    // styleCount
-        pool.AddRange(BitConverter.GetBytes(0u));    // flags = UTF-16
+        pool.AddRange(BitConverter.GetBytes((uint)strings.Length));
+        pool.AddRange(BitConverter.GetBytes(0u));
+        pool.AddRange(BitConverter.GetBytes(0u)); // UTF-16
         pool.AddRange(BitConverter.GetBytes((uint)poolHeader));
-        pool.AddRange(BitConverter.GetBytes(0u));    // stylesStart
-        pool.AddRange(BitConverter.GetBytes(0u));    // offset[0]
+        pool.AddRange(BitConverter.GetBytes(0u));
+        foreach (var off in offsets) pool.AddRange(BitConverter.GetBytes(off));
         pool.AddRange(poolData);
 
-        // START_NAMESPACE（aapt2 编译的 res XML 会把元素包在命名空间节点里，测试递归识别）
-        var startNs = new List<byte>();
-        startNs.AddRange(BitConverter.GetBytes((ushort)0x0100));
-        startNs.AddRange(BitConverter.GetBytes((ushort)16));
-        startNs.AddRange(BitConverter.GetBytes((uint)24));
-        startNs.AddRange(BitConverter.GetBytes(0u));
-        startNs.AddRange(BitConverter.GetBytes(0xFFFFFFFFu));
-        startNs.AddRange(BitConverter.GetBytes(0xFFFFFFFFu)); // prefix
-        startNs.AddRange(BitConverter.GetBytes(0xFFFFFFFFu)); // uri
-        var endNs = new List<byte>(startNs);
-        endNs[0] = 0x03; endNs[1] = 0x01; // END_NAMESPACE (0x0103 → 0x0101)
+        byte[] Ns(bool start)
+        {
+            var n = new List<byte>();
+            n.AddRange(BitConverter.GetBytes((ushort)(start ? 0x0100 : 0x0101)));
+            n.AddRange(BitConverter.GetBytes((ushort)16));
+            n.AddRange(BitConverter.GetBytes((uint)24));
+            n.AddRange(BitConverter.GetBytes(0u));
+            n.AddRange(BitConverter.GetBytes(0xFFFFFFFFu));
+            n.AddRange(BitConverter.GetBytes((uint)4)); // prefix = android
+            n.AddRange(BitConverter.GetBytes((uint)5)); // uri
+            return n.ToArray();
+        }
 
-        var start = new List<byte>();
-        start.AddRange(BitConverter.GetBytes((ushort)0x0102)); // START_ELEMENT
-        start.AddRange(BitConverter.GetBytes((ushort)16));
-        start.AddRange(BitConverter.GetBytes((uint)36));       // 16 + 20 + 0 属性
-        start.AddRange(BitConverter.GetBytes(0u));
-        start.AddRange(BitConverter.GetBytes(0xFFFFFFFFu));    // comment
-        start.AddRange(BitConverter.GetBytes(0xFFFFFFFFu));    // ns
-        start.AddRange(BitConverter.GetBytes(0u));             // nameIdx
-        start.AddRange(BitConverter.GetBytes((ushort)20));
-        start.AddRange(BitConverter.GetBytes((ushort)20));
-        start.AddRange(BitConverter.GetBytes((ushort)0));      // attrCount
-        start.AddRange(BitConverter.GetBytes((ushort)0));
-        start.AddRange(BitConverter.GetBytes((ushort)0));
-        start.AddRange(BitConverter.GetBytes((ushort)0));
+        byte[] StartElement(uint nameIdx, uint? refId)
+        {
+            var hasAttr = refId != null;
+            var el = new List<byte>();
+            el.AddRange(BitConverter.GetBytes((ushort)0x0102));
+            el.AddRange(BitConverter.GetBytes((ushort)16));
+            el.AddRange(BitConverter.GetBytes((uint)(16 + 20 + (hasAttr ? 20 : 0))));
+            el.AddRange(BitConverter.GetBytes(0u));
+            el.AddRange(BitConverter.GetBytes(0xFFFFFFFFu));
+            el.AddRange(BitConverter.GetBytes((uint)5));  // ns = android URI
+            el.AddRange(BitConverter.GetBytes(nameIdx));
+            el.AddRange(BitConverter.GetBytes((ushort)20));
+            el.AddRange(BitConverter.GetBytes((ushort)20));
+            el.AddRange(BitConverter.GetBytes((ushort)(hasAttr ? 1 : 0)));
+            el.AddRange(BitConverter.GetBytes((ushort)0));
+            el.AddRange(BitConverter.GetBytes((ushort)0));
+            el.AddRange(BitConverter.GetBytes((ushort)0));
+            if (hasAttr)
+            {
+                // attr: ns=5, name=6(drawable), raw=NoIndex, type=0x01, data=refId
+                el.AddRange(BitConverter.GetBytes((uint)5));
+                el.AddRange(BitConverter.GetBytes((uint)6));
+                el.AddRange(BitConverter.GetBytes(0xFFFFFFFFu));
+                el.AddRange(BitConverter.GetBytes((ushort)8));
+                el.Add(0);
+                el.Add(0x01);
+                el.AddRange(BitConverter.GetBytes(refId!.Value));
+            }
+            return el.ToArray();
+        }
 
-        var end = new List<byte>();
-        end.AddRange(BitConverter.GetBytes((ushort)0x0103));   // END_ELEMENT
-        end.AddRange(BitConverter.GetBytes((ushort)16));
-        end.AddRange(BitConverter.GetBytes((uint)24));
-        end.AddRange(BitConverter.GetBytes(0u));
-        end.AddRange(BitConverter.GetBytes(0xFFFFFFFFu));
-        end.AddRange(BitConverter.GetBytes(0xFFFFFFFFu));      // ns
-        end.AddRange(BitConverter.GetBytes(0u));               // nameIdx
+        byte[] EndElement(uint nameIdx)
+        {
+            var el = new List<byte>();
+            el.AddRange(BitConverter.GetBytes((ushort)0x0103));
+            el.AddRange(BitConverter.GetBytes((ushort)16));
+            el.AddRange(BitConverter.GetBytes((uint)24));
+            el.AddRange(BitConverter.GetBytes(0u));
+            el.AddRange(BitConverter.GetBytes(0xFFFFFFFFu));
+            el.AddRange(BitConverter.GetBytes((uint)5));
+            el.AddRange(BitConverter.GetBytes(nameIdx));
+            return el.ToArray();
+        }
+
+        // NS + adaptive-icon + background + foreground + monochrome + END(adaptive-icon) + END_NS
+        var body = new List<byte>();
+        body.AddRange(Ns(true));
+        body.AddRange(StartElement(0, null));
+        body.AddRange(StartElement(1, 0x7f060001)); // background
+        body.AddRange(EndElement(1));
+        body.AddRange(StartElement(2, 0x7f080002)); // foreground
+        body.AddRange(EndElement(2));
+        body.AddRange(StartElement(3, 0x7f080003)); // monochrome
+        body.AddRange(EndElement(3));
+        body.AddRange(EndElement(0));
+        body.AddRange(Ns(false));
 
         var xml = new List<byte>();
-        xml.AddRange(BitConverter.GetBytes((ushort)0x0003));   // RES_XML
+        xml.AddRange(BitConverter.GetBytes((ushort)0x0003));
         xml.AddRange(BitConverter.GetBytes((ushort)8));
-        xml.AddRange(BitConverter.GetBytes((uint)(8 + pool.Count + startNs.Count + start.Count + end.Count + endNs.Count)));
+        xml.AddRange(BitConverter.GetBytes((uint)(8 + pool.Count + body.Count)));
         xml.AddRange(pool);
-        xml.AddRange(startNs);
-        xml.AddRange(start);
-        xml.AddRange(end);
-        xml.AddRange(endNs);
+        xml.AddRange(body);
         return xml.ToArray();
     }
 
