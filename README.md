@@ -147,7 +147,7 @@ Android SDK 自动探测（环境变量 → 上次记住的目录 → 常见路�
 - 本工具与 `android/` 下的接入代码均为 GPL-3.0（[LICENSE](LICENSE)）；Android 补丁文件源自 ZalithLauncher2（Copyright (C) 2025 MovTery 及贡献者），版权声明已保留。
 - 分发内嵌整合包的修改版 ZL2 时，须遵守 ZL2 的 GPLv3 附加条款：构建期在 `ZalithLauncher/gradle.properties` 重命名（不得含 “ZalithLauncher”/“ZL”）、启动页标注“非官方修改版”、保留版权声明。
 - 本工具默认不改名、不改图标；可在打包时**手动指定** `--package`（包名）、`--app-name`（应用名）与 `--icon`（桌面图标）。注意：改包名后文件分享/导入导出类功能（FileProvider authority）可能与代码内常量不一致，正式分发仍建议在源码构建期（`gradle.properties`）重命名。
-- 图标替换：`--icon <png|jpg|webp>` 会把各密度桶的 mipmap 位图（webp/png）按原始尺寸缩放替换，并移除 anydpi 自适应图标 XML（Android 8+ 桌面回退到替换后的位图，代价是失去系统「主题化图标」特性）。纯矢量图标（无位图桶）的 APK 无法替换，会提示跳过。
+- 图标替换：`--icon <png|jpg|webp>` 会把各密度桶的 mipmap 位图（webp/png）按原始尺寸缩放替换，并把自适应图标 XML 重写为指向被替换的宿主位图 `img_launcher`（「设置-关于」顶部启动器图标会同步变成新图标）、移除 monochrome 子元素（Android 13+ 主题图标不再显示旧图标）。纯矢量图标（无位图桶且无宿主位图）的 APK 会提示跳过。
 
 ## 常见问题
 
