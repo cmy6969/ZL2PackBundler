@@ -672,3 +672,16 @@ index 00000000..ac2aafa2
 +        assertEquals(3L, parsed.packVersion)
 +    }
 +}
+diff --git a/ZalithLauncher/proguard-rules.pro b/ZalithLauncher/proguard-rules.pro
+index 398efa74..ba60f48c 100644
+--- a/ZalithLauncher/proguard-rules.pro
++++ b/ZalithLauncher/proguard-rules.pro
+@@ -51,4 +51,7 @@
+ }
+ 
+ # Libraries
+ -keep class com.github.steveice10.opennbt.** { *; }
+\ No newline at end of file
++# ZL2PackBundler（内嵌整合包；GSON 反射反序列化依赖字段名，禁止 R8 混淆）
++-keep class com.movtery.zalithlauncher.game.download.modpack.install.BundledModpackManifest { *; }
++-keep class com.movtery.zalithlauncher.game.download.modpack.install.BundledToolInfo { *; }
