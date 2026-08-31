@@ -48,14 +48,26 @@ public class ArscResolverTests
     /// 包名区 256 字节 UTF-16、headerSize 288。
     /// </summary>
     internal static byte[] BuildArsc()
+        => BuildArsc(null);
+
+    /// <summary>可选自定义 ic_launcher 的文件路径：[0]=anydpi 配置，[1]=密度桶配置（模拟 shrinkResources 的短路径）。</summary>
+    internal static byte[] BuildArsc(string[]? iconPaths)
     {
-        var globalStrings = new[]
-        {
-            "res/mipmap-anydpi/ic_launcher.xml",        // 0
-            "res/mipmap-xhdpi/ic_launcher.webp",        // 1
-            "res/mipmap-anydpi/ic_launcher_round.xml",  // 2
-            "res/mipmap-mdpi/ic_launcher_round.webp",   // 3
-        };
+        var globalStrings = iconPaths != null
+            ? new[]
+            {
+                iconPaths[0],                                   // 0
+                iconPaths[1],                                   // 1
+                "res/mipmap-anydpi/ic_launcher_round.xml",      // 2
+                "res/mipmap-mdpi/ic_launcher_round.webp",       // 3
+            }
+            : new[]
+            {
+                "res/mipmap-anydpi/ic_launcher.xml",        // 0
+                "res/mipmap-xhdpi/ic_launcher.webp",        // 1
+                "res/mipmap-anydpi/ic_launcher_round.xml",  // 2
+                "res/mipmap-mdpi/ic_launcher_round.webp",   // 3
+            };
 
         var typeStrings = new[] { "mipmap", "drawable" };
         var keyStrings = new[] { "ic_launcher", "ic_launcher_round", "ic_alias" };

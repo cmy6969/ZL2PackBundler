@@ -59,16 +59,22 @@ public static class IconPatcher
             foreach (var file in files)
             {
                 var lower = file.ToLowerInvariant();
-                if (lower.EndsWith(".xml", StringComparison.Ordinal)
-                    && lower.Contains("anydpi", StringComparison.Ordinal))
+                if (lower.EndsWith(".xml", StringComparison.Ordinal))
                 {
-                    // 自适应图标 XML：移除，让所有版本回退到已替换的位图图标
-                    if (entryNames.Contains(file))
+                    // 自适应图标 XML 必须按内容识别：shrinkResources 会把路径缩短成 res/BW.xml
+                    // 这类形式（不含 anydpi 字样），只看路径会漏掉，导致设备继续使用旧的自适应图标。
+                    var xmlBytes = readEntry(file);
+                    if (lower.Contains("anydpi", StringComparison.Ordinal)
+                        || (xmlBytes != null && IsAdaptiveIconXml(xmlBytes)))
                     {
-                        entryOverrides[file] = null;
-                        result.Removed.Add(file);
+                        // 移除自适应图标 XML：让所有版本回退到已替换的位图图标
+                        if (entryNames.Contains(file))
+                        {
+                            entryOverrides[file] = null;
+                            result.Removed.Add(file);
+                        }
+                        continue;
                     }
-                    continue;
                 }
                 if (!lower.EndsWith(".webp", StringComparison.Ordinal)
                     && !lower.EndsWith(".png", StringComparison.Ordinal))
@@ -93,5 +99,34 @@ public static class IconPatcher
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// 判断字节流是否为自适应图标 XML（二进制 AXML，根元素 adaptive-icon 或 icon）。
+    /// 非 AXML / 解析失败返回 false（按普通 XML 处理）。
+    /// </summary>
+    private static bool IsAdaptiveIconXml(byte[] bytes)
+    {
+        try
+        {
+            var doc = AxmlPatcher.Parse(bytes);
+            // 元素可能被 START_NAMESPACE 节点包裹（aapt2 编译的 res XML），需递归查找
+            return doc.Roots.Any(r => HasElementNamed(doc, r));
+        }
+        catch
+        {
+            // 非 AXML 或解析失败：按普通 XML 处理
+        }
+        return false;
+
+        static bool HasElementNamed(AxmlPatcher.Document doc, AxmlPatcher.Node node)
+        {
+            if (node.Kind == 0x0102 /* ResXmlStartElement */)
+            {
+                var name = doc.Pool.Strings[(int)node.NameIdx];
+                if (name == "adaptive-icon" || name == "icon") return true;
+            }
+            return node.Children.Any(c => HasElementNamed(doc, c));
+        }
     }
 }

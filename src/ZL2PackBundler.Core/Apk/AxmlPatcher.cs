@@ -305,15 +305,24 @@ public static class AxmlPatcher
     {
         if (utf8)
         {
-            var b0 = reader.ReadU8();
-            int len = (b0 & 0x80) != 0 ? ((b0 & 0x7F) << 8) | reader.ReadU8() : b0;
-            return Encoding.UTF8.GetString(reader.ReadBytes(len));
+            // aapt2 的 UTF-8 池字符串编码：[utf16长度(1-2字节)][utf8长度(1-2字节)][数据][NUL]。
+            // 纯 ASCII 时两个长度相等（看似重复字节），非 ASCII 时 utf16 < utf8。
+            ReadPoolLength(reader); // utf16 长度（本工具不需要）
+            var utf8Len = ReadPoolLength(reader);
+            return Encoding.UTF8.GetString(reader.ReadBytes(utf8Len));
         }
         var len16 = reader.ReadU16();
         var strLen = (len16 & 0x8000) != 0 ? (int)(reader.ReadU32() & 0x7FFFFFFF) : len16;
         var chars = new char[strLen];
         for (var i = 0; i < strLen; i++) chars[i] = (char)reader.ReadU16();
         return new string(chars);
+    }
+
+    private static int ReadPoolLength(Reader reader)
+    {
+        var b0 = reader.ReadU8();
+        if ((b0 & 0x80) != 0) return ((b0 & 0x7F) << 8) | reader.ReadU8();
+        return b0;
     }
 
     private static Node ParseFlatNode(Reader reader, int start, int size)
