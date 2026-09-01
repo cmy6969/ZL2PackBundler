@@ -12,6 +12,7 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel vm = new();
     private int page;
+    private bool packFinished;
 
     public MainWindow()
     {
@@ -41,6 +42,8 @@ public partial class MainWindow : Window
         // 第3步（配置）也有「下一步」：点击等价于「开始打包」
         NextButton.IsEnabled = index is 1 or 2;
         NextButton.Visibility = index <= 2 ? Visibility.Visible : Visibility.Collapsed;
+        // 第4步：构建完成后显示「完成」按钮
+        DoneButton.Visibility = index == 3 && packFinished ? Visibility.Visible : Visibility.Collapsed;
         UpdateStepper(index);
     }
 
@@ -190,6 +193,8 @@ public partial class MainWindow : Window
             MessageBox.Show(this, "请完整填写基础 APK、整合包与输出路径。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+        packFinished = false;
+        DoneButton.Visibility = Visibility.Collapsed;
         SetPage(3);
         vm.LogText = "";
         vm.ProgressValue = 0;
@@ -223,6 +228,8 @@ public partial class MainWindow : Window
             var report = await Task.Run(() => PackPipeline.Run(options, progress.Report));
             vm.ProgressValue = 100;
             vm.ProgressText = "完成";
+            packFinished = true;
+            DoneButton.Visibility = Visibility.Visible;
             vm.LogText =
                 $"=== 打包完成 ===\n类型: {report.Type} / 格式: {report.Format}\n" +
                 $"名称: {report.Name} / MC: {report.McVersion ?? "-"}\n" +
@@ -242,6 +249,17 @@ public partial class MainWindow : Window
             vm.LogText = "错误：" + ex.Message + "\n\n" + vm.LogText;
             MessageBox.Show(this, ex.Message, "打包失败", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void OnDone(object sender, RoutedEventArgs e)
+    {
+        // 回到第1步并清空进度状态
+        packFinished = false;
+        DoneButton.Visibility = Visibility.Collapsed;
+        vm.ProgressValue = 0;
+        vm.ProgressText = "";
+        vm.LogText = "";
+        SetPage(0);
     }
 
     private void OnBack(object sender, RoutedEventArgs e) => SetPage(Math.Max(0, page - 1));

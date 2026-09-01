@@ -296,6 +296,8 @@
         <Border Grid.Row="3" Background="White" BorderBrush="{StaticResource CardBorder}" BorderThickness="0,1,0,0" Padding="20,10">
             <DockPanel LastChildFill="False">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="DoneButton" Content="完成" Style="{StaticResource PrimaryButton}" Width="96"
+                            Click="OnDone" Visibility="Collapsed"/>
                     <Button x:Name="BackButton" Content="上一步" Style="{StaticResource GhostButton}" Width="88"
                             Click="OnBack" Margin="0,0,8,0"/>
                     <Button x:Name="NextButton" Content="下一步" Style="{StaticResource PrimaryButton}" Width="96"
