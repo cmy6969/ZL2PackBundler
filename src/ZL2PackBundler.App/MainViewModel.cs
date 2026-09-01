@@ -78,4 +78,8 @@ public sealed class MainViewModel : ObservableObject
 
     private string pageTitle = "";
     public string PageTitle { get => pageTitle; set => Set(ref pageTitle, value); }
+
+    /// <summary>工具版本（标题栏显示）。</summary>
+    public string VersionText { get; } =
+        "v" + (typeof(ZL2PackBundler.Core.Apk.BundledTools).Assembly.GetName().Version?.ToString(3) ?? "1.0.0");
 }

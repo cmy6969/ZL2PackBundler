@@ -1,110 +1,313 @@
 <Window x:Class="ZL2PackBundler.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="ZL2PackBundler — 整合包内嵌 APK 工具"
-        Width="900" Height="680" WindowStartupLocation="CenterScreen">
-    <Grid Margin="16">
+        Width="1020" Height="760" MinWidth="880" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None" ResizeMode="CanResize"
+        Background="{StaticResource PageBackground}"
+        FontFamily="Segoe UI" FontSize="13"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Ideal">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="44" CornerRadius="10" GlassFrameThickness="0"
+                            ResizeBorderThickness="6" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+
+    <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="44"/>
+            <RowDefinition Height="88"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="{Binding PageTitle}" FontSize="22" FontWeight="Bold" Margin="0,0,0,12"/>
+        <!-- ============ 标题栏 ============ -->
+        <Border Grid.Row="0" Background="White" BorderBrush="{StaticResource CardBorder}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
+                    <Border Width="26" Height="26" CornerRadius="7" Background="{StaticResource AccentBrush}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="Z" Foreground="White" FontSize="14" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="ZL2PackBundler" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding VersionText}" FontSize="12" Foreground="{StaticResource TextMuted}"
+                               Margin="8,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                    <Button Style="{StaticResource TitleBarButton}" Content="&#xE921;" Click="OnMinimize"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                    <Button Style="{StaticResource TitleBarButton}" Content="&#xE922;" Click="OnMaximize"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                    <Button Style="{StaticResource TitleBarCloseButton}" Content="&#xE8BB;" Click="OnClose"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                </StackPanel>
+            </Grid>
+        </Border>
 
-        <Grid Grid.Row="1">
-            <!-- 页1：选择基础 APK 与整合包 -->
+        <!-- ============ 步骤条 ============ -->
+        <Grid Grid.Row="1" Background="White">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border x:Name="Step1Circle" Width="30" Height="30" CornerRadius="15"
+                        Background="#E5E9F2" HorizontalAlignment="Center">
+                    <TextBlock x:Name="Step1Text" Text="1" Foreground="{StaticResource TextMuted}"
+                               FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </StackPanel>
+            <Rectangle Grid.Row="0" Grid.Column="1" x:Name="Conn1" Width="56" Height="2" Margin="0,14,0,0"
+                       Fill="#E5E9F2"/>
+            <StackPanel Grid.Row="0" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border x:Name="Step2Circle" Width="30" Height="30" CornerRadius="15"
+                        Background="#E5E9F2" HorizontalAlignment="Center">
+                    <TextBlock x:Name="Step2Text" Text="2" Foreground="{StaticResource TextMuted}"
+                               FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </StackPanel>
+            <Rectangle Grid.Row="0" Grid.Column="3" x:Name="Conn2" Width="56" Height="2" Margin="0,14,0,0"
+                       Fill="#E5E9F2"/>
+            <StackPanel Grid.Row="0" Grid.Column="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border x:Name="Step3Circle" Width="30" Height="30" CornerRadius="15"
+                        Background="#E5E9F2" HorizontalAlignment="Center">
+                    <TextBlock x:Name="Step3Text" Text="3" Foreground="{StaticResource TextMuted}"
+                               FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </StackPanel>
+            <Rectangle Grid.Row="0" Grid.Column="5" x:Name="Conn3" Width="56" Height="2" Margin="0,14,0,0"
+                       Fill="#E5E9F2"/>
+            <StackPanel Grid.Row="0" Grid.Column="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border x:Name="Step4Circle" Width="30" Height="30" CornerRadius="15"
+                        Background="#E5E9F2" HorizontalAlignment="Center">
+                    <TextBlock x:Name="Step4Text" Text="4" Foreground="{StaticResource TextMuted}"
+                               FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </StackPanel>
+
+            <TextBlock x:Name="Step1Label" Grid.Row="1" Grid.Column="0" Text="选择" HorizontalAlignment="Center"
+                       FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,8,0,12"/>
+            <TextBlock x:Name="Step2Label" Grid.Row="1" Grid.Column="2" Text="分析" HorizontalAlignment="Center"
+                       FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,8,0,12"/>
+            <TextBlock x:Name="Step3Label" Grid.Row="1" Grid.Column="4" Text="配置" HorizontalAlignment="Center"
+                       FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,8,0,12"/>
+            <TextBlock x:Name="Step4Label" Grid.Row="1" Grid.Column="6" Text="打包" HorizontalAlignment="Center"
+                       FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,8,0,12"/>
+        </Grid>
+
+        <!-- ============ 页面内容 ============ -->
+        <Grid Grid.Row="2" Margin="28,22,28,18">
+            <!-- 页1：选择 -->
             <StackPanel x:Name="Page1">
-                <TextBlock Text="基础 APK（官方原版或已打补丁的构建均可；官方原版将自动注入安装器）" FontWeight="SemiBold"/>
-                <DockPanel Margin="0,4,0,4">
-                    <Button DockPanel.Dock="Right" Content="浏览…" Width="80" Click="OnBrowseApk"/>
-                    <TextBox Text="{Binding ApkPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                </DockPanel>
-                <TextBlock Text="{Binding BaseApkStatus}" Foreground="#2563EB" TextWrapping="Wrap" Margin="0,0,0,16"/>
-                <TextBlock Text="整合包（.minecraft 文件夹 或 整合包 zip）" FontWeight="SemiBold"/>
-                <DockPanel Margin="0,4,0,16">
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <Button Content="选文件夹" Width="80" Margin="4,0,0,0" Click="OnBrowsePackFolder"/>
-                        <Button Content="选压缩包" Width="80" Margin="4,0,0,0" Click="OnBrowsePackFile"/>
-                    </StackPanel>
-                    <TextBox Text="{Binding PackPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                </DockPanel>
-                <Button Content="分析" Width="120" HorizontalAlignment="Left" Click="OnAnalyze"/>
+                <TextBlock Text="选择输入" Style="{StaticResource PageTitle}"/>
+                <TextBlock Text="选择官方原版或已打补丁的 ZL2 APK，以及要内嵌的整合包" Style="{StaticResource PageSubtitle}" Margin="0,4,0,16"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <DockPanel>
+                                <TextBlock Text="基础 APK" Style="{StaticResource SectionTitle}"/>
+                                <Border DockPanel.Dock="Right" Style="{StaticResource Badge}"
+                                        Background="{StaticResource InfoTint}" Padding="10,3">
+                                    <TextBlock Text="{Binding BaseApkStatus}" FontSize="11.5"
+                                               Foreground="{StaticResource InfoBrush}"/>
+                                </Border>
+                            </DockPanel>
+                            <TextBlock Text="官方原版将自动注入内置安装器；已打补丁的构建直接嵌入"
+                                       Style="{StaticResource MutedText}" Margin="0,4,0,12"/>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="浏览…" Style="{StaticResource SecondaryButton}"
+                                        Width="86" Click="OnBrowseApk" Margin="8,0,0,0"/>
+                                <TextBox Text="{Binding ApkPath, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBox}"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="整合包" Style="{StaticResource SectionTitle}"/>
+                            <TextBlock Text=".minecraft 文件夹（完全离线）或整合包 zip（首次导入可能联网）"
+                                       Style="{StaticResource MutedText}" Margin="0,4,0,12"/>
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="选压缩包" Style="{StaticResource SecondaryButton}" Width="86"
+                                            Click="OnBrowsePackFile" Margin="8,0,0,0"/>
+                                    <Button Content="选文件夹" Style="{StaticResource SecondaryButton}" Width="86"
+                                            Click="OnBrowsePackFolder" Margin="8,0,0,0"/>
+                                </StackPanel>
+                                <TextBox Text="{Binding PackPath, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBox}"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+                <Button Content="分析整合包" Style="{StaticResource PrimaryButton}" Width="150" Margin="0,18,0,0"
+                        HorizontalAlignment="Right" Click="OnAnalyze"/>
             </StackPanel>
 
             <!-- 页2：分析结果 -->
             <StackPanel x:Name="Page2" Visibility="Collapsed">
-                <TextBox Text="{Binding AnalysisText}" IsReadOnly="True" TextWrapping="Wrap"
-                         Height="320" VerticalScrollBarVisibility="Auto"/>
-                <TextBlock Text="{Binding WarningsText}" Foreground="#B45309" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                <TextBlock Text="分析结果" Style="{StaticResource PageTitle}"/>
+                <TextBlock Text="确认整合包类型与离线完整性，缺失项会在首次启动时联网补齐"
+                           Style="{StaticResource PageSubtitle}" Margin="0,4,0,16"/>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBox Text="{Binding AnalysisText}" Style="{StaticResource ModernReadOnlyBox}"
+                                 Height="300" VerticalScrollBarVisibility="Auto"/>
+                        <Border x:Name="WarningsBadge" Style="{StaticResource Badge}" Background="{StaticResource WarnTint}"
+                                Margin="0,14,0,0" Padding="12,8" HorizontalAlignment="Left" Visibility="Collapsed">
+                            <TextBlock Text="{Binding WarningsText}" Foreground="{StaticResource WarnBrush}"
+                                       FontSize="12.5" TextWrapping="Wrap" MaxWidth="860"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
             </StackPanel>
 
             <!-- 页3：签名与输出 -->
             <StackPanel x:Name="Page3" Visibility="Collapsed">
-                <TextBlock Text="Android SDK 目录（留空自动探测；找不到时请手动选择）" FontWeight="SemiBold"/>
-                <DockPanel Margin="0,4,0,12">
-                    <Button DockPanel.Dock="Right" Content="浏览…" Width="80" Click="OnBrowseSdk"/>
-                    <TextBox Text="{Binding SdkPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                </DockPanel>
-                <RadioButton Content="自动生成测试 keystore（仅测试分发）" IsChecked="{Binding UseAutoKeyStore}" GroupName="sign" Margin="0,4,0,4"/>
-                <RadioButton Content="使用自有 keystore" IsChecked="{Binding UseOwnKeyStore}" GroupName="sign" Margin="0,4,0,4"/>
-                <Grid Margin="24,4,0,12" IsEnabled="{Binding UseOwnKeyStore}">
+                <TextBlock Text="签名与输出" Style="{StaticResource PageTitle}"/>
+                <TextBlock Text="配置 Android SDK、签名密钥、输出路径与可选定制项"
+                           Style="{StaticResource PageSubtitle}" Margin="0,4,0,16"/>
+                <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
-                    </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="keystore 路径" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding KeyStorePath, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"/>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="store 密码" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <PasswordBox Grid.Row="1" Grid.Column="1" x:Name="KeyStorePassBox" Margin="0,2"/>
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="别名" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding KeyAlias, UpdateSourceTrigger=PropertyChanged}" Margin="0,2"/>
-                    <TextBlock Grid.Row="3" Grid.Column="0" Text="key 密码" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <PasswordBox Grid.Row="3" Grid.Column="1" x:Name="KeyPassBox" Margin="0,2"/>
+                    <Border Grid.Column="0" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="签名配置" Style="{StaticResource SectionTitle}" Margin="0,0,0,14"/>
+                            <TextBlock Text="Android SDK 目录" Style="{StaticResource FieldLabel}"/>
+                            <DockPanel Margin="0,0,0,14">
+                                <Button DockPanel.Dock="Right" Content="浏览…" Style="{StaticResource SecondaryButton}"
+                                        Width="80" Click="OnBrowseSdk" Margin="8,0,0,0"/>
+                                <TextBox Text="{Binding SdkPath, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBox}"/>
+                            </DockPanel>
+                            <RadioButton Content="自动生成测试 keystore（仅测试分发）" Style="{StaticResource ModernRadio}"
+                                         IsChecked="{Binding UseAutoKeyStore}" GroupName="sign" Margin="0,2,0,8"/>
+                            <RadioButton Content="使用自有 keystore" Style="{StaticResource ModernRadio}"
+                                         IsChecked="{Binding UseOwnKeyStore}" GroupName="sign" Margin="0,0,0,10"/>
+                            <Grid Margin="20,0,0,0" IsEnabled="{Binding UseOwnKeyStore}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="keystore 路径" Style="{StaticResource FieldLabel}"
+                                           VerticalAlignment="Center" Margin="0,0,10,6"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding KeyStorePath, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="store 密码" Style="{StaticResource FieldLabel}"
+                                           VerticalAlignment="Center" Margin="0,0,10,6"/>
+                                <PasswordBox Grid.Row="1" Grid.Column="1" x:Name="KeyStorePassBox"
+                                             Style="{StaticResource ModernPasswordBox}" Margin="0,0,0,6"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="别名" Style="{StaticResource FieldLabel}"
+                                           VerticalAlignment="Center" Margin="0,0,10,6"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding KeyAlias, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"/>
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="key 密码" Style="{StaticResource FieldLabel}"
+                                           VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <PasswordBox Grid.Row="3" Grid.Column="1" x:Name="KeyPassBox"
+                                             Style="{StaticResource ModernPasswordBox}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="输出与定制" Style="{StaticResource SectionTitle}" Margin="0,0,0,14"/>
+                            <TextBlock Text="输出 APK 路径" Style="{StaticResource FieldLabel}"/>
+                            <DockPanel Margin="0,0,0,14">
+                                <Button DockPanel.Dock="Right" Content="浏览…" Style="{StaticResource SecondaryButton}"
+                                        Width="80" Click="OnBrowseOutput" Margin="8,0,0,0"/>
+                                <TextBox Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBox}"/>
+                            </DockPanel>
+                            <TextBlock Text="修改包名（可选，如 com.example.renamed）" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding PackageName, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}" Margin="0,0,0,12"/>
+                            <TextBlock Text="修改应用名称（可选）" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding AppName, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}" Margin="0,0,0,12"/>
+                            <TextBlock Text="作者信息（可选，写入 APK）" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding Author, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}" Margin="0,0,0,12"/>
+                            <TextBlock Text="应用图标（可选，PNG/JPG/WebP）" Style="{StaticResource FieldLabel}"/>
+                            <DockPanel Margin="0,0,0,16">
+                                <Button DockPanel.Dock="Right" Content="清除" Style="{StaticResource GhostButton}" Width="56"
+                                        Click="OnClearIcon" Margin="6,0,0,0"/>
+                                <Button DockPanel.Dock="Right" Content="浏览…" Style="{StaticResource SecondaryButton}" Width="80"
+                                        Click="OnBrowseIcon" Margin="6,0,0,0"/>
+                                <TextBox Text="{Binding IconPath, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBox}"/>
+                            </DockPanel>
+                            <Button Content="开始打包" Style="{StaticResource PrimaryButton}" Height="38"
+                                    HorizontalAlignment="Stretch" Click="OnStartPack"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
-                <TextBlock Text="输出 APK 路径" FontWeight="SemiBold"/>
-                <DockPanel Margin="0,4,0,0">
-                    <Button DockPanel.Dock="Right" Content="浏览…" Width="80" Click="OnBrowseOutput"/>
-                    <TextBox Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                </DockPanel>
-                <TextBlock Text="修改包名（可选，如 com.example.renamed）" FontWeight="SemiBold" Margin="0,12,0,0"/>
-                <TextBox Text="{Binding PackageName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,8"/>
-                <TextBlock Text="修改应用名称（可选）" FontWeight="SemiBold"/>
-                <TextBox Text="{Binding AppName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"/>
-                <TextBlock Text="作者信息（可选，写入 APK 的 manifest.json 与 AndroidManifest meta-data）" FontWeight="SemiBold" Margin="0,12,0,0"/>
-                <TextBox Text="{Binding Author, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"/>
-                <TextBlock Text="应用图标（可选，PNG/JPG/WebP；按各密度桶尺寸缩放替换，并移除自适应图标 XML）" FontWeight="SemiBold" Margin="0,12,0,0"/>
-                <DockPanel Margin="0,4,0,0">
-                    <Button DockPanel.Dock="Right" Content="浏览…" Width="80" Click="OnBrowseIcon"/>
-                    <Button DockPanel.Dock="Right" Content="清除" Width="60" Margin="0,0,8,0" Click="OnClearIcon"/>
-                    <TextBox Text="{Binding IconPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                </DockPanel>
-                <Button Content="开始打包" Width="140" Margin="0,16,0,0" Click="OnStartPack"/>
             </StackPanel>
 
-            <!-- 页4：进度与报告 -->
+            <!-- 页4：进度 -->
             <Grid x:Name="Page4" Visibility="Collapsed">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <StackPanel Grid.Row="0">
-                    <TextBlock Text="{Binding ProgressText}" Margin="0,0,0,4"/>
-                    <ProgressBar Height="18" Minimum="0" Maximum="100" Value="{Binding ProgressValue}"/>
-                </StackPanel>
-                <TextBox Grid.Row="1" Text="{Binding LogText}" IsReadOnly="True" TextWrapping="Wrap"
-                         Margin="0,12,0,0" VerticalScrollBarVisibility="Auto"/>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock Text="打包进度" Style="{StaticResource SectionTitle}"/>
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding ProgressText}" FontSize="12.5"
+                                       Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <ProgressBar Style="{StaticResource ModernProgressBar}" Margin="0,14,0,0"
+                                     Minimum="0" Maximum="100" Value="{Binding ProgressValue}"/>
+                    </StackPanel>
+                </Border>
+                <TextBox Grid.Row="1" Text="{Binding LogText}" Style="{StaticResource LogBox}"
+                         Margin="0,16,0,0" VerticalScrollBarVisibility="Auto"/>
             </Grid>
         </Grid>
 
-        <DockPanel Grid.Row="2" LastChildFill="False">
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button x:Name="BackButton" Content="上一步" Width="90" Click="OnBack" Margin="0,0,8,0"/>
-                <Button x:Name="NextButton" Content="下一步" Width="90" Click="OnNext"/>
-            </StackPanel>
-            <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Foreground="#6B7280"
-                       Text="ZL2PackBundler · 作者：cmy6969 · https://github.com/cmy6969/ZL2PackBundler · GPL-3.0"/>
-        </DockPanel>
+        <!-- ============ 底栏 ============ -->
+        <Border Grid.Row="3" Background="White" BorderBrush="{StaticResource CardBorder}" BorderThickness="0,1,0,0" Padding="20,10">
+            <DockPanel LastChildFill="False">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="BackButton" Content="上一步" Style="{StaticResource GhostButton}" Width="88"
+                            Click="OnBack" Margin="0,0,8,0"/>
+                    <Button x:Name="NextButton" Content="下一步" Style="{StaticResource PrimaryButton}" Width="96"
+                            Click="OnNext"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="作者：cmy6969" FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                    <Button Content="GitHub" Style="{StaticResource GhostButton}" Padding="8,3" FontSize="12"
+                            Click="OnOpenGitHub"/>
+                    <TextBlock Text="· GPL-3.0" FontSize="12" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
     </Grid>
 </Window>

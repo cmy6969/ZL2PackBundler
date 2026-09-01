@@ -1,4 +1,7 @@
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Shapes;
 using Microsoft.Win32;
 using ZL2PackBundler.Core;
 using ZL2PackBundler.Core.Signing;
@@ -37,6 +40,61 @@ public partial class MainWindow : Window
         BackButton.IsEnabled = index > 0 && index < 3;
         NextButton.IsEnabled = index == 1;
         NextButton.Visibility = index <= 1 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateStepper(index);
+    }
+
+    /// <summary>步骤条：已完成=对勾+蓝色，当前=蓝色，未开始=灰色。</summary>
+    private void UpdateStepper(int index)
+    {
+        SetStep(1, Step1Circle, Step1Text, Step1Label, index, 0);
+        SetStep(2, Step2Circle, Step2Text, Step2Label, index, 1);
+        SetStep(3, Step3Circle, Step3Text, Step3Label, index, 2);
+        SetStep(4, Step4Circle, Step4Text, Step4Label, index, 3);
+        SetConnector(Conn1, index > 0);
+        SetConnector(Conn2, index > 1);
+        SetConnector(Conn3, index > 2);
+    }
+
+    private static void SetStep(int number, Border circle, TextBlock text, TextBlock label, int current, int stepIndex)
+    {
+        var brush = new System.Windows.Media.SolidColorBrush(
+            current > stepIndex
+                ? System.Windows.Media.Color.FromRgb(0x25, 0x63, 0xEB)   // 已完成：蓝色
+                : current == stepIndex
+                    ? System.Windows.Media.Color.FromRgb(0x25, 0x63, 0xEB) // 当前：蓝色
+                    : System.Windows.Media.Color.FromRgb(0xE5, 0xE9, 0xF2)); // 未开始：灰
+        circle.Background = brush;
+        text.Text = current > stepIndex ? "✓" : number.ToString();
+        text.Foreground = new System.Windows.Media.SolidColorBrush(
+            current >= stepIndex ? System.Windows.Media.Colors.White : System.Windows.Media.Color.FromRgb(0x6B, 0x72, 0x80));
+        label.Foreground = new System.Windows.Media.SolidColorBrush(
+            current >= stepIndex
+                ? System.Windows.Media.Color.FromRgb(0x11, 0x18, 0x27)
+                : System.Windows.Media.Color.FromRgb(0x6B, 0x72, 0x80));
+        label.FontWeight = current >= stepIndex ? FontWeights.SemiBold : FontWeights.Normal;
+    }
+
+    private static void SetConnector(Rectangle connector, bool done)
+    {
+        connector.Fill = new System.Windows.Media.SolidColorBrush(
+            done ? System.Windows.Media.Color.FromRgb(0x25, 0x63, 0xEB) : System.Windows.Media.Color.FromRgb(0xE5, 0xE9, 0xF2));
+    }
+
+    // ---------- 自定义标题栏 ----------
+    private void OnMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void OnMaximize(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void OnClose(object sender, RoutedEventArgs e) => Close();
+
+    private void OnOpenGitHub(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://github.com/cmy6969/ZL2PackBundler") { UseShellExecute = true });
+        }
+        catch { /* 忽略打开失败 */ }
     }
 
     private void OnBrowseApk(object sender, RoutedEventArgs e)
@@ -112,6 +170,9 @@ public partial class MainWindow : Window
             vm.WarningsText = result.OfflineReport.Any(i => !i.Present)
                 ? "注意：存在缺失项，首次启动仍需联网补齐上述内容。若要完全离线，请补全后再打包。"
                 : "";
+            WarningsBadge.Visibility = string.IsNullOrEmpty(vm.WarningsText)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
             SetPage(1);
         }
         catch (Exception ex)
