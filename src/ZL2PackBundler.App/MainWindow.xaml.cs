@@ -38,8 +38,9 @@ public partial class MainWindow : Window
             _ => "④ 打包进度与报告"
         };
         BackButton.IsEnabled = index > 0 && index < 3;
-        NextButton.IsEnabled = index == 1;
-        NextButton.Visibility = index <= 1 ? Visibility.Visible : Visibility.Collapsed;
+        // 第3步（配置）也有「下一步」：点击等价于「开始打包」
+        NextButton.IsEnabled = index is 1 or 2;
+        NextButton.Visibility = index <= 2 ? Visibility.Visible : Visibility.Collapsed;
         UpdateStepper(index);
     }
 
@@ -244,5 +245,14 @@ public partial class MainWindow : Window
     }
 
     private void OnBack(object sender, RoutedEventArgs e) => SetPage(Math.Max(0, page - 1));
-    private void OnNext(object sender, RoutedEventArgs e) => SetPage(Math.Min(2, page + 1));
+    private void OnNext(object sender, RoutedEventArgs e)
+    {
+        if (page == 2)
+        {
+            // 配置页的「下一步」= 开始打包（含输入校验）
+            OnStartPack(sender, e);
+            return;
+        }
+        SetPage(Math.Min(2, page + 1));
+    }
 }
