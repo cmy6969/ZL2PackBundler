@@ -198,13 +198,8 @@
                     <Border Grid.Column="0" Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="签名配置" Style="{StaticResource SectionTitle}" Margin="0,0,0,14"/>
-                            <TextBlock Text="Android SDK 目录" Style="{StaticResource FieldLabel}"/>
-                            <DockPanel Margin="0,0,0,14">
-                                <Button DockPanel.Dock="Right" Content="浏览…" Style="{StaticResource SecondaryButton}"
-                                        Width="80" Click="OnBrowseSdk" Margin="8,0,0,0"/>
-                                <TextBox Text="{Binding SdkPath, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource ModernTextBox}"/>
-                            </DockPanel>
+                            <TextBlock Text="工具链已内置（便携版自动使用内嵌的 JRE/zipalign/aapt2/apksigner）"
+                                       Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,0,14"/>
                             <RadioButton Content="自动生成测试 keystore（仅测试分发）" Style="{StaticResource ModernRadio}"
                                          IsChecked="{Binding UseAutoKeyStore}" GroupName="sign" Margin="0,2,0,8"/>
                             <RadioButton Content="使用自有 keystore" Style="{StaticResource ModernRadio}"

@@ -49,9 +49,6 @@ public sealed class MainViewModel : ObservableObject
     private bool useOwnKeyStore;
     public bool UseOwnKeyStore { get => useOwnKeyStore; set => Set(ref useOwnKeyStore, value); }
 
-    private string sdkPath = "";
-    public string SdkPath { get => sdkPath; set => Set(ref sdkPath, value); }
-
     private string packageName = "";
     public string PackageName { get => packageName; set => Set(ref packageName, value); }
 

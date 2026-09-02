@@ -151,7 +151,7 @@ The Android SDK is auto-detected (env vars → last remembered dir → common pa
 
 ## FAQ
 
-- **"Android SDK build-tools not found"**: pass `--sdk <SDK dir>` once (or pick it once in the GUI) and it is remembered; or set `ANDROID_HOME`.
+- **"Android SDK build-tools not found"**: only possible when running development builds from source. The portable builds embed the full toolchain (JRE + zipalign/aapt2/apksigner), so the GUI no longer asks for an SDK directory; for development builds pass `--sdk <SDK dir>` once and it is remembered, or set `ANDROID_HOME`.
 - **Official-APK injection is fast and lossless**: it binary-patches AndroidManifest.xml and replaces zip entries directly — no apktool, no resource rebuild; the original APK's resources.arsc and all resource files are preserved byte-for-byte. You can also use an already-patched build to skip injection.
 - **No progress bar / no version after install**: official path — check for the "Installing bundled modpack" screen; patched build path — confirm the log contains `Bundled modpack manifest loaded` (old tool versions wrote `type` with wrong casing; repack with the latest version).
 - **Package too large**: see size guardrails; evaluate channel size limits (e.g. Play) for official distribution.

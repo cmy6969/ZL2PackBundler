@@ -19,9 +19,6 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = vm;
         SetPage(0);
-        // 预填自动探测到的 SDK（找不到时留空，由用户手动选择）
-        var detected = AndroidSdk.TryLocate();
-        if (detected?.SdkRoot != null) vm.SdkPath = detected.SdkRoot;
     }
 
     private void SetPage(int index)
@@ -143,12 +140,6 @@ public partial class MainWindow : Window
 
     private void OnClearIcon(object sender, RoutedEventArgs e) => vm.IconPath = "";
 
-    private void OnBrowseSdk(object sender, RoutedEventArgs e)
-    {
-        var dlg = new OpenFolderDialog { Title = "选择 Android SDK 根目录（含 build-tools 的目录）" };
-        if (dlg.ShowDialog(this) == true) vm.SdkPath = dlg.FolderName;
-    }
-
     private void OnBrowseOutput(object sender, RoutedEventArgs e)
     {
         var dlg = new SaveFileDialog { Filter = "APK 文件 (*.apk)|*.apk", FileName = "out.apk" };
@@ -211,7 +202,6 @@ public partial class MainWindow : Window
                 BaseApk = vm.ApkPath,
                 PackInput = vm.PackPath,
                 OutputApk = vm.OutputPath,
-                SdkDir = string.IsNullOrWhiteSpace(vm.SdkPath) ? null : vm.SdkPath,
                 PackageName = string.IsNullOrWhiteSpace(vm.PackageName) ? null : vm.PackageName.Trim(),
                 AppName = string.IsNullOrWhiteSpace(vm.AppName) ? null : vm.AppName.Trim(),
                 Author = string.IsNullOrWhiteSpace(vm.Author) ? null : vm.Author.Trim(),

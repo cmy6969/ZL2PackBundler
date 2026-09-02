@@ -151,7 +151,7 @@ Android SDK 自动探测（环境变量 → 上次记住的目录 → 常见路�
 
 ## 常见问题
 
-- **报“未找到 Android SDK build-tools”**：`--sdk <SDK目录>` 指定一次（GUI 里选择一次）即被记住；或设置 `ANDROID_HOME`。
+- **报“未找到 Android SDK build-tools”**：仅从源码运行开发版时可能出现。便携版已内置完整工具链（JRE + zipalign/aapt2/apksigner），GUI 不再提供 SDK 选择项；开发版可用 `--sdk <SDK目录>` 指定一次即被记住，或设置 `ANDROID_HOME`。
 - **官方原版 APK 注入很快且无损**：直接二进制修补 AndroidManifest.xml 并替换 zip 条目，不经过 apktool、不重建资源，原 APK 的 resources.arsc 与全部资源文件逐字节保留；也支持直接选用打补丁构建的 APK 跳过注入。
 - **装机后无进度条/无版本**：官方原版路径看是否出现「正在安装内嵌整合包」界面；打补丁构建路径确认日志中有 `Bundled modpack manifest loaded`（旧版工具产出的大小写 `type` 已修复，请用最新版重新打包）。
 - **包体过大**：参考体积护栏；正式渠道分发请评估 Play 等渠道的包体积限制。
