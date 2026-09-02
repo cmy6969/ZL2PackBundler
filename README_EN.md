@@ -81,8 +81,6 @@ dotnet publish src/ZL2PackBundler.App -c Release -r win-x64 --self-contained tru
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64
 ```
 
-The GitHub Actions workflow is manual-only (Actions → Run workflow); build outputs are uploaded as workflow artifacts and are **never published to Releases automatically**. Publishing portable exes to Releases is a manual step.
-
 ## Full packaging workflow
 
 1. **Prepare the base APK (choose one)**:
@@ -132,15 +130,6 @@ The Android SDK is auto-detected (env vars → last remembered dir → common pa
 
 - `pack.zip` > 2 GB: warning (zip 32-bit boundary risk, slow install/extraction)
 - Final APK > 4 GB: rejected (exceeds zip32 format capacity)
-
-## Device acceptance checklist
-
-1. Install the output APK → first launch shows the "Installing bundled modpack" progress screen (official path) or the splash "Bundled modpack" progress item (patched build path)
-2. Patched build path: logs contain `BundledModpackManifest/INFO Bundled modpack manifest loaded` and `Bundled snapshot installed`
-3. The MC version appears in the version list on the main screen
-4. With airplane mode on, launch the game with an offline account and reach the title/world (fully offline)
-5. A second cold start does not re-extract the pack
-6. An original APK without a bundled pack behaves unchanged
 
 ## GPL-3.0 compliance
 

@@ -81,8 +81,6 @@ dotnet publish src/ZL2PackBundler.App -c Release -r win-x64 --self-contained tru
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish/win-x64
 ```
 
-GitHub Actions 工作流仅支持手动触发（Actions 页面 → Run workflow），构建产物只作为工作流附件（Artifacts）上传，**不会自动发布到 Releases**；发布便携 exe 需手动操作。
-
 ## 完整出包流程
 
 1. **准备基础 APK（二选一）**：
@@ -132,15 +130,6 @@ Android SDK 自动探测（环境变量 → 上次记住的目录 → 常见路�
 
 - `pack.zip` > 2GB：警告（zip 32 位边界风险、安装/解包慢）
 - 最终 APK > 4GB：拒绝（超出 zip 32 位格式承载能力）
-
-## 真机验收清单
-
-1. 安装输出 APK → 首次启动出现「正在安装内嵌整合包」进度界面（官方原版路径）或 splash 的「Bundled modpack」进度项（打补丁构建路径）
-2. 打补丁构建路径：日志出现 `BundledModpackManifest/INFO Bundled modpack manifest loaded` 与 `Bundled snapshot installed`
-3. 主界面版本列表出现该 MC 版本
-4. 飞行模式下用离线账号启动游戏，能进标题/世界（完全离线）
-5. 再次冷启动不重复解包
-6. 无内嵌包的原始 APK 行为不变
 
 ## GPL-3.0 合规说明
 
